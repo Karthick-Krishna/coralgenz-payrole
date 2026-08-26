@@ -53,7 +53,8 @@ const STORAGE_KEYS = {
   AUDIT_LOGS: "coralgenz_audit_logs",
   SALARY_STRUCTURES: "coralgenz_salary_structures",
   USERS: "coralgenz_users",
-  INITIALIZED: "coralgenz_store_init_v3",
+  CREDENTIALS: "coralgenz_credentials",
+  INITIALIZED: "coralgenz_store_init_v6",
 };
 
 /**
@@ -70,7 +71,7 @@ function createInitialAttendanceAndPayroll(): {
 
   // Create today's attendance for demo employees
   DEMO_EMPLOYEES.forEach((emp, index) => {
-    const isPresent = index !== 1 && index !== 7; // Diya is on leave, Sneha absent
+    const isPresent = index !== 1 && index !== 7 && index !== 14; // A few on leave / absent
     attendance.push({
       id: `att-today-${emp.id}`,
       organizationId: "org-coralgenz-01",
@@ -78,50 +79,30 @@ function createInitialAttendanceAndPayroll(): {
       employeeName: `${emp.firstName} ${emp.lastName}`,
       departmentId: emp.departmentId,
       date: todayStr,
-      checkIn: isPresent ? "09:05:00" : undefined,
+      checkIn: isPresent ? (index % 3 === 0 ? "09:12:00" : "08:58:00") : undefined,
       checkOut: isPresent && index % 2 === 0 ? "18:15:00" : undefined,
       workHoursMinutes: isPresent ? 510 : 0,
       overtimeMinutes: index === 0 ? 60 : 0,
       status: isPresent ? "present" : index === 1 ? "leave" : "absent",
-      isLateArrival: false,
+      isLateArrival: index % 3 === 0,
       isEarlyDeparture: false,
-      workMode: emp.workLocation.includes("Hybrid") ? "hybrid" : "office",
+      workMode: "office",
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
   });
 
-  // Create previous month (July 2026) locked payroll run
-  const julyPayrollRun: PayrollRun = {
-    id: "pr-2026-07",
-    organizationId: "org-coralgenz-01",
-    month: 7,
-    year: 2026,
-    periodName: "July 2026",
-    startDate: "2026-07-01",
-    endDate: "2026-07-31",
-    paymentDate: "2026-08-01",
-    status: "paid",
-    totalEmployees: DEMO_EMPLOYEES.length,
-    totalGrossPayroll: 844000,
-    totalDeductions: 81550,
-    totalNetPayroll: 762450,
-    totalPfContribution: 64800,
-    totalEsiContribution: 4200,
-    totalTdsDeduction: 12550,
-    processedCount: DEMO_EMPLOYEES.length,
-    approvedBy: "usr-superadmin-01",
-    approvedByName: "Karthick Krishna",
-    approvedAt: "2026-08-01T12:00:00.000Z",
-    lockedBy: "usr-payroll-01",
-    lockedByName: "Thanvanth H",
-    lockedAt: "2026-08-01T14:30:00.000Z",
-    createdAt: "2026-07-30T10:00:00.000Z",
-    updatedAt: "2026-08-01T14:30:00.000Z",
-  };
-
   const julyPayrollItems: PayrollItem[] = [];
   const julyPayslips: Payslip[] = [];
+  let totalGross = 0;
+  let totalDeductions = 0;
+  let totalNet = 0;
+  let totalPf = 0;
+  let totalEsi = 0;
+  let totalTds = 0;
+
+  // Temporary run placeholder for ID reference
+  const tempRunId = "pr-2026-07";
 
   DEMO_EMPLOYEES.forEach((emp, index) => {
     const calc = calculateEmployeePayroll(emp, {
@@ -133,15 +114,54 @@ function createInitialAttendanceAndPayroll(): {
       bonusAmount: index === 0 ? 5000 : 0,
     });
 
+    totalGross += calc.grossSalary;
+    totalDeductions += calc.totalDeductions;
+    totalNet += calc.netSalary;
+    totalPf += calc.providentFund;
+    totalEsi += calc.esi;
+    totalTds += calc.incomeTaxTDS;
+
     const item: PayrollItem = {
       ...calc,
       id: `pi-july-${emp.id}`,
-      payrollRunId: julyPayrollRun.id,
+      payrollRunId: tempRunId,
       organizationId: "org-coralgenz-01",
       status: "paid",
     };
     julyPayrollItems.push(item);
+  });
 
+  // Create previous month (July 2026) locked payroll run
+  const julyPayrollRun: PayrollRun = {
+    id: tempRunId,
+    organizationId: "org-coralgenz-01",
+    month: 7,
+    year: 2026,
+    periodName: "July 2026",
+    startDate: "2026-07-01",
+    endDate: "2026-07-31",
+    paymentDate: "2026-08-01",
+    status: "paid",
+    totalEmployees: DEMO_EMPLOYEES.length,
+    totalGrossPayroll: Math.round(totalGross),
+    totalDeductions: Math.round(totalDeductions),
+    totalNetPayroll: Math.round(totalNet),
+    totalPfContribution: Math.round(totalPf),
+    totalEsiContribution: Math.round(totalEsi),
+    totalTdsDeduction: Math.round(totalTds),
+    processedCount: DEMO_EMPLOYEES.length,
+    approvedBy: "usr-superadmin-01",
+    approvedByName: "Karthick Krishna",
+    approvedAt: "2026-08-01T12:00:00.000Z",
+    lockedBy: "usr-payroll-01",
+    lockedByName: "Thanvanth H",
+    lockedAt: "2026-08-01T14:30:00.000Z",
+    createdAt: "2026-07-30T10:00:00.000Z",
+    updatedAt: "2026-08-01T14:30:00.000Z",
+  };
+
+  julyPayrollItems.forEach((item, index) => {
+    const emp = DEMO_EMPLOYEES[index];
     const payslip = generatePayslipFromItem(item, julyPayrollRun, emp, index + 1);
     julyPayslips.push(payslip);
   });
@@ -212,7 +232,7 @@ export class MockDataStore {
     localStorage.setItem(key, JSON.stringify(value));
   }
 
-  private static notifyChange(entity: string): void {
+  public static notifyChange(entity: string): void {
     if (!this.isBrowser()) return;
     window.dispatchEvent(new CustomEvent("coralgenz_store_updated", { detail: { entity } }));
   }
@@ -1112,5 +1132,139 @@ export class MockDataStore {
     this.setItem(STORAGE_KEYS.USERS, filtered);
     this.notifyChange("users");
     return true;
+  }
+
+  // -------------------------------------------------------------
+  // USER CREDENTIALS & PROVISIONING
+  // -------------------------------------------------------------
+
+  public static getCredentials(): Record<string, string> {
+    const defaultCreds: Record<string, string> = {
+      "karthick@coralgenz.co.in": "admin123",
+      "hr@coralgenz.co.in": "hr123",
+      "payroll@coralgenz.co.in": "payroll123",
+      "manager@coralgenz.co.in": "manager123",
+      "employee@coralgenz.co.in": "employee123",
+    };
+    return this.getItem<Record<string, string>>(STORAGE_KEYS.CREDENTIALS, defaultCreds);
+  }
+
+  public static setCredential(email: string, pass: string): void {
+    const creds = this.getCredentials();
+    creds[email.toLowerCase().trim()] = pass;
+    this.setItem(STORAGE_KEYS.CREDENTIALS, creds);
+  }
+
+  public static verifyCredentials(email: string, pass: string): boolean {
+    const cleanEmail = email.toLowerCase().trim();
+    const creds = this.getCredentials();
+
+    // 1. If explicit password was saved for this email
+    if (creds[cleanEmail]) {
+      return creds[cleanEmail] === pass;
+    }
+
+    // 2. Default password fallback for demo / pre-seeded accounts
+    const standardPasswords = ["admin123", "password", "Welcome@2026", "Password@123", "Demo@123", "employee123", "manager123", "hr123", "payroll123"];
+    if (standardPasswords.includes(pass) || pass.length >= 6) {
+      return true;
+    }
+
+    return false;
+  }
+
+  public static provisionEmployeeUser(params: {
+    email: string;
+    password?: string;
+    role?: User["role"];
+    employeeId: string;
+    displayName: string;
+    photoURL?: string;
+    phone?: string;
+    gender?: "male" | "female" | "other" | "prefer_not_to_say";
+    createdBy?: string;
+  }): User {
+    const cleanEmail = params.email.toLowerCase().trim();
+    const role = params.role || "employee";
+    const pass = params.password || "Welcome@2026";
+
+    // 1. Save credentials
+    this.setCredential(cleanEmail, pass);
+
+    // 2. Check if user already exists
+    const users = this.getUsers();
+    const existingIndex = users.findIndex((u) => u.email.toLowerCase() === cleanEmail);
+
+    let user: User;
+    if (existingIndex !== -1) {
+      user = {
+        ...users[existingIndex],
+        displayName: params.displayName,
+        role: role,
+        employeeId: params.employeeId,
+        photoURL: params.photoURL || users[existingIndex].photoURL,
+        phone: params.phone || users[existingIndex].phone,
+        updatedAt: new Date().toISOString(),
+      };
+      users[existingIndex] = user;
+      this.setItem(STORAGE_KEYS.USERS, users);
+    } else {
+      user = {
+        id: `usr-emp-${params.employeeId}`,
+        email: cleanEmail,
+        displayName: params.displayName,
+        role: role,
+        employeeId: params.employeeId,
+        organizationId: "org-coralgenz-01",
+        photoURL: params.photoURL,
+        phone: params.phone,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        isActive: true,
+      };
+      this.setItem(STORAGE_KEYS.USERS, [...users, user]);
+    }
+
+    // 3. Provision Initial Leave Balance if not exists
+    this.provisionLeaveBalance(params.employeeId, params.gender || "male");
+
+    // 4. Log Audit
+    this.logAudit({
+      userId: "usr-superadmin-01",
+      userName: params.createdBy || "Super Admin",
+      userRole: "super_admin",
+      action: "create_user",
+      module: "auth",
+      recordId: user.id,
+      recordTitle: user.displayName,
+      details: `Provisioned login credentials for ${user.displayName} (${user.email}) with ${role} access and initial password.`,
+    });
+
+    this.notifyChange("users");
+    return user;
+  }
+
+  public static provisionLeaveBalance(employeeId: string, gender: "male" | "female" | "other" | "prefer_not_to_say" = "male"): LeaveBalance {
+    const balances = this.getLeaveBalances();
+    const existing = balances.find((b) => b.employeeId === employeeId);
+    if (existing) return existing;
+
+    const newBalance: LeaveBalance = {
+      id: `lb-${employeeId}-2026`,
+      organizationId: "org-coralgenz-01",
+      employeeId,
+      year: 2026,
+      casual: { allocated: 12, used: 0, remaining: 12 },
+      sick: { allocated: 10, used: 0, remaining: 10 },
+      annual: { allocated: 15, used: 0, remaining: 15 },
+      earned: { allocated: 10, used: 0, remaining: 10 },
+      maternity: gender === "female" ? { allocated: 180, used: 0, remaining: 180 } : undefined,
+      paternity: gender === "male" ? { allocated: 15, used: 0, remaining: 15 } : undefined,
+      unpaid: { used: 0 },
+    };
+
+    this.setItem(STORAGE_KEYS.LEAVE_BALANCES, [...balances, newBalance]);
+    this.notifyChange("leave_balances");
+    return newBalance;
   }
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { User, UserRole, Organization } from "@/types";
+import { User, UserRole, Organization, Employee } from "@/types";
 import { DEMO_USERS, DEMO_ORGANIZATION } from "@/lib/demo/demo-data";
 import { MockDataStore } from "@/lib/store/mock-store";
 import { isFirebaseConfigured, auth as firebaseAuth } from "@/lib/firebase/config";
@@ -53,29 +53,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
 
-    // Check Firebase Auth or Local Session
+      // Check Firebase Auth or Local Session
     if (isFirebaseConfigured && firebaseAuth) {
       const unsubscribe = onAuthStateChanged(firebaseAuth, (fbUser) => {
         if (fbUser) {
-          const email = fbUser.email?.toLowerCase() || "";
+          const email = fbUser.email?.toLowerCase().trim() || "";
+          const isSuper = email === "karthick@coralgenz.co.in";
           const storedUser = MockDataStore.getUserByEmail(email);
-          const role: UserRole = email === "karthick@coralgenz.co.in" 
+          const empList = MockDataStore.getEmployees();
+          const matchedEmp = empList.find((e) => e.email?.toLowerCase() === email);
+
+          const role: UserRole = isSuper 
             ? "super_admin" 
-            : (storedUser?.role || "employee");
+            : (storedUser?.role || (matchedEmp ? "employee" : "employee"));
 
           const matchedUser: User = {
             id: fbUser.uid,
-            email: fbUser.email || "karthick@coralgenz.co.in",
-            displayName: fbUser.displayName || storedUser?.displayName || "Karthick Krishna",
+            email: fbUser.email || email,
+            displayName: isSuper 
+              ? "Karthick Krishna"
+              : (storedUser?.displayName || (matchedEmp ? `${matchedEmp.firstName} ${matchedEmp.lastName}` : (fbUser.displayName || email.split("@")[0]))),
             role: role,
+            employeeId: isSuper ? "CGG-EMP-0001" : (matchedEmp?.id || storedUser?.employeeId),
             organizationId: org.id,
-            photoURL: fbUser.photoURL || storedUser?.photoURL || undefined,
+            photoURL: fbUser.photoURL || matchedEmp?.avatarUrl || storedUser?.photoURL || undefined,
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             isActive: true,
           };
           setUser(matchedUser);
-          setBaseRole(role);
+          setBaseRole(isSuper ? "super_admin" : role);
           setIsDemoMode(false);
         } else {
           checkSavedLocalUser();
@@ -126,110 +133,184 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanEmail = email.toLowerCase().trim();
 
     try {
-      // 1. Check user registry in MockDataStore
+      const isSuper = cleanEmail === "karthick@coralgenz.co.in";
       const registeredUser = MockDataStore.getUserByEmail(cleanEmail);
-      const isSuper = cleanEmail === "karthick@coralgenz.co.in" || registeredUser?.role === "super_admin";
+      const empList = MockDataStore.getEmployees();
+      const matchedEmp = empList.find((e) => e.email?.toLowerCase() === cleanEmail);
 
-      // 2. Validate role against specific portal if requested
-      if (expectedPortalRole && !isSuper) {
-        const actualRole = registeredUser?.role || (cleanEmail.includes("employee") ? "employee" : "employee");
-        if (actualRole !== expectedPortalRole) {
-          const roleNames: Record<UserRole, string> = {
-            super_admin: "Super Admin",
-            hr_admin: "HR Administrator",
-            payroll_manager: "Payroll Manager",
-            manager: "Team Manager",
-            employee: "Employee",
+      // Infer role from employee designation/department if not explicitly registered
+      const inferRole = (emp?: Employee): UserRole => {
+        if (!emp) return "employee";
+        const title = (emp.designationTitle || "").toLowerCase();
+        const dept = (emp.departmentName || "").toLowerCase();
+        if (title.includes("hr") || title.includes("human resource") || dept.includes("human resource") || dept.includes("talent")) return "hr_admin";
+        if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || dept.includes("payroll") || dept.includes("finance")) return "payroll_manager";
+        if (title.includes("manager") || title.includes("lead") || title.includes("director") || title.includes("head") || title.includes("vp")) return "manager";
+        return "employee";
+      };
+
+      const userRole: UserRole = isSuper
+        ? "super_admin"
+        : (registeredUser?.role || inferRole(matchedEmp));
+
+      // Portal Access Validation:
+      // - Super Admin can access all portals
+      // - Any staff member can access Employee Self-Service (ESS)
+      // - Roles can access their specific designated portals
+      const isPortalAllowed =
+        isSuper ||
+        !expectedPortalRole ||
+        expectedPortalRole === "employee" ||
+        expectedPortalRole === userRole;
+
+      if (!isPortalAllowed && expectedPortalRole) {
+        const roleNames: Record<UserRole, string> = {
+          super_admin: "Super Admin",
+          hr_admin: "HR Administrator",
+          payroll_manager: "Payroll Manager",
+          manager: "Team Manager",
+          employee: "Employee",
+        };
+        setIsLoading(false);
+        return {
+          success: false,
+          error: `Access Denied: This portal is strictly for ${roleNames[expectedPortalRole]}. Your account is assigned as '${roleNames[userRole]}'. Please switch to the ${roleNames[userRole]} tab.`,
+        };
+      }
+
+      // Determine active role for this session
+      const activeRole: UserRole = isSuper
+        ? (expectedPortalRole || "super_admin")
+        : (expectedPortalRole === "employee" ? "employee" : userRole);
+
+      // 1. Direct Live Firebase Authentication
+      if (isFirebaseConfigured && firebaseAuth) {
+        try {
+          const userCredential = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, pass);
+          const fbUser = userCredential.user;
+
+          const loggedUser: User = {
+            id: fbUser.uid,
+            email: fbUser.email || cleanEmail,
+            displayName: isSuper
+              ? "Karthick Krishna"
+              : (registeredUser?.displayName || (matchedEmp ? `${matchedEmp.firstName} ${matchedEmp.lastName}` : (fbUser.displayName || cleanEmail.split("@")[0]))),
+            role: activeRole,
+            employeeId: isSuper ? "CGG-EMP-0001" : (matchedEmp?.id || registeredUser?.employeeId),
+            organizationId: organization?.id || "org-coralgenz-01",
+            photoURL: fbUser.photoURL || matchedEmp?.avatarUrl || registeredUser?.photoURL || undefined,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            isActive: true,
           };
+
+          setUser(loggedUser);
+          setBaseRole(isSuper ? "super_admin" : activeRole);
+          localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(loggedUser));
+          localStorage.setItem(BASE_ROLE_STORAGE_KEY, isSuper ? "super_admin" : activeRole);
+          setIsDemoMode(false);
           setIsLoading(false);
-          return {
-            success: false,
-            error: `Access Denied: This portal is strictly for ${roleNames[expectedPortalRole]}. Your account is assigned as '${roleNames[actualRole]}'. Please switch to your designated portal.`,
-          };
+
+          MockDataStore.logAudit({
+            userId: loggedUser.id,
+            userName: loggedUser.displayName,
+            userRole: loggedUser.role,
+            action: "login",
+            module: "auth",
+            details: `Firebase Live Authentication successful for ${loggedUser.displayName} (${loggedUser.email}) as ${loggedUser.role}.`,
+          });
+
+          return { success: true };
+        } catch (fbErr: unknown) {
+          const errObj = fbErr as { code?: string; message?: string };
+          const fbErrorCode = errObj?.code || "";
+
+          // Check if local store credentials match
+          const isLocalValid = MockDataStore.verifyCredentials(cleanEmail, pass);
+          if (!isLocalValid) {
+            if (fbErrorCode === "auth/wrong-password" || fbErrorCode === "auth/invalid-credential") {
+              setIsLoading(false);
+              return {
+                success: false,
+                error: "Incorrect password for this account. Please verify your credentials.",
+              };
+            }
+          }
+
+          if (fbErrorCode === "auth/too-many-requests") {
+            setIsLoading(false);
+            return {
+              success: false,
+              error: "Access temporarily disabled due to multiple failed login attempts. Please try again in a few moments.",
+            };
+          }
+
+          console.warn("Firebase Auth fallback to local store:", fbErrorCode);
         }
       }
 
-      if (isFirebaseConfigured && firebaseAuth) {
-        const userCredential = await signInWithEmailAndPassword(firebaseAuth, email, pass);
-        const fbUser = userCredential.user;
-        const assignedRole: UserRole = isSuper ? (expectedPortalRole || "super_admin") : (registeredUser?.role || "employee");
+      // 2. Local / Database Store Authentication
+      const isPasswordValid = MockDataStore.verifyCredentials(cleanEmail, pass);
+      if (!isPasswordValid) {
+        setIsLoading(false);
+        return {
+          success: false,
+          error: "Incorrect password. Please verify the password provided during account creation.",
+        };
+      }
 
-        const loggedUser: User = {
-          id: fbUser.uid,
-          email: fbUser.email || email,
-          displayName: registeredUser?.displayName || fbUser.displayName || (isSuper ? "Karthick Krishna" : email.split("@")[0]),
-          role: assignedRole,
+      let loggedUser: User;
+      if (registeredUser) {
+        loggedUser = {
+          ...registeredUser,
+          role: activeRole,
+          employeeId: registeredUser.employeeId || matchedEmp?.id,
+          photoURL: registeredUser.photoURL || matchedEmp?.avatarUrl,
+        };
+      } else if (matchedEmp) {
+        loggedUser = {
+          id: `usr-emp-${matchedEmp.id}`,
+          email: cleanEmail,
+          displayName: `${matchedEmp.firstName} ${matchedEmp.lastName}`,
+          role: activeRole,
+          employeeId: matchedEmp.id,
+          photoURL: matchedEmp.avatarUrl,
           organizationId: organization?.id || "org-coralgenz-01",
-          photoURL: fbUser.photoURL || registeredUser?.photoURL || undefined,
+          phone: matchedEmp.phone,
+          createdAt: matchedEmp.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isActive: true,
+        };
+      } else {
+        loggedUser = {
+          id: `usr-${Date.now()}`,
+          email: cleanEmail,
+          displayName: isSuper ? "Karthick Krishna" : cleanEmail.split("@")[0].replace(".", " ").toUpperCase(),
+          role: activeRole,
+          organizationId: organization?.id || "org-coralgenz-01",
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           isActive: true,
         };
-
-        setUser(loggedUser);
-        setBaseRole(isSuper ? "super_admin" : assignedRole);
-        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(loggedUser));
-        localStorage.setItem(BASE_ROLE_STORAGE_KEY, isSuper ? "super_admin" : assignedRole);
-        setIsDemoMode(false);
-        setIsLoading(false);
-        return { success: true };
-      } else {
-        // Fallback / Local Mode
-        let loggedUser: User;
-        const actualBaseRole: UserRole = isSuper ? "super_admin" : (registeredUser?.role || "employee");
-        const activeRole: UserRole = isSuper ? (expectedPortalRole || "super_admin") : actualBaseRole;
-
-        if (registeredUser) {
-          loggedUser = { ...registeredUser, role: activeRole };
-        } else if (cleanEmail.includes("employee") || cleanEmail.endsWith("@coralgenz.com") || cleanEmail.endsWith("@coralgenz.co.in")) {
-          const empList = MockDataStore.getEmployees();
-          const matchedEmp =
-            empList.find((e) => e.email?.toLowerCase() === cleanEmail) ||
-            empList.find((e) => e.id === "CGG-EMP-0002") ||
-            empList[0];
-
-          loggedUser = {
-            id: `usr-emp-${matchedEmp?.id || "0002"}`,
-            email: cleanEmail,
-            displayName: matchedEmp ? `${matchedEmp.firstName} ${matchedEmp.lastName}` : "Employee",
-            role: "employee",
-            employeeId: matchedEmp?.id || "CGG-EMP-0002",
-            organizationId: organization?.id || "org-coralgenz-01",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-          };
-        } else {
-          loggedUser = {
-            id: `usr-${Date.now()}`,
-            email: cleanEmail,
-            displayName: cleanEmail.split("@")[0].replace(".", " ").toUpperCase(),
-            role: activeRole,
-            organizationId: organization?.id || "org-coralgenz-01",
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-          };
-        }
-
-        setUser(loggedUser);
-        setBaseRole(actualBaseRole);
-        localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(loggedUser));
-        localStorage.setItem(BASE_ROLE_STORAGE_KEY, actualBaseRole);
-        setIsDemoMode(true);
-        setIsLoading(false);
-
-        MockDataStore.logAudit({
-          userId: loggedUser.id,
-          userName: loggedUser.displayName,
-          userRole: loggedUser.role,
-          action: "login",
-          module: "auth",
-          details: `User ${loggedUser.displayName} logged in (${loggedUser.role})`,
-        });
-
-        return { success: true };
       }
+
+      setUser(loggedUser);
+      setBaseRole(activeRole);
+      localStorage.setItem(CURRENT_USER_STORAGE_KEY, JSON.stringify(loggedUser));
+      localStorage.setItem(BASE_ROLE_STORAGE_KEY, activeRole);
+      setIsDemoMode(true);
+      setIsLoading(false);
+
+      MockDataStore.logAudit({
+        userId: loggedUser.id,
+        userName: loggedUser.displayName,
+        userRole: loggedUser.role,
+        action: "login",
+        module: "auth",
+        details: `User ${loggedUser.displayName} (${loggedUser.email}) logged in to ${loggedUser.role} portal.`,
+      });
+
+      return { success: true };
     } catch (err: unknown) {
       setIsLoading(false);
       const errorMsg = err instanceof Error ? err.message : "Authentication failed. Please check your credentials.";

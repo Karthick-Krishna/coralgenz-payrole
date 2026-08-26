@@ -87,7 +87,10 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
   const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "payroll_manager" || currentRole === "manager";
 
   // Filter requests
-  const myEmployeeId = user?.employeeId || "CGG-EMP-0002";
+  const myEmployeeId =
+    user?.employeeId ||
+    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
+    "CGG-EMP-0002";
   const filteredRequests = requests.filter((req) => {
     // If employee, only show own requests when in "my_requests" tab or if employee role
     if (isEmployee || activeTab === "my_requests") {
@@ -115,8 +118,6 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
     setTitle("");
     setDescription("");
     setAmount(undefined);
-    setMerchantName("");
-    setPurpose("");
     setShowCreateModal(true);
   };
 
@@ -127,7 +128,10 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
       return;
     }
 
-    const currentEmp = employees.find((e) => e.id === myEmployeeId) || employees[0];
+    const currentEmp =
+      employees.find((e) => e.id === myEmployeeId) ||
+      employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase()) ||
+      employees[0];
 
     const payload: EmployeeRequest["payload"] = {};
     if (requestType === "expense_claim") {

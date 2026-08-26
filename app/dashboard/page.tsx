@@ -54,10 +54,16 @@ export default function DashboardPage() {
     return () => window.removeEventListener("coralgenz_store_updated", loadData);
   }, []);
 
-  const currentEmpId = user?.employeeId || "CGG-EMP-0002";
-  const currentEmployee = employees.find((e) => e.id === currentEmpId) || employees[1];
+  const currentEmployee = employees.find(
+    (e) => (user?.employeeId && e.id === user.employeeId) || (user?.email && e.email?.toLowerCase() === user.email?.toLowerCase())
+  ) || employees.find((e) => e.id === "CGG-EMP-0002") || employees[0];
+
+  const currentEmpId = currentEmployee?.id || user?.employeeId || "CGG-EMP-0002";
   const currentBalance = leaveBalances.find((b) => b.employeeId === currentEmpId);
   const myPayslip = payslips.find((p) => p.employeeId === currentEmpId);
+  const myLeaveRequests = leaveRequests.filter(
+    (lr) => lr.employeeId === currentEmpId || (user?.displayName && lr.employeeName === user.displayName)
+  );
   const teamEmployees = employees.filter((e) => e.managerId === currentEmpId);
 
   return (
@@ -103,7 +109,7 @@ export default function DashboardPage() {
         <EmployeeDashboard
           employee={currentEmployee}
           leaveBalance={currentBalance}
-          leaveRequests={leaveRequests}
+          leaveRequests={myLeaveRequests}
           latestPayslip={myPayslip}
           announcements={announcements}
           holidays={holidays}

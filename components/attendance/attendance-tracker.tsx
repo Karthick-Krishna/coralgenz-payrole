@@ -69,7 +69,17 @@ export function AttendanceTracker({
     return () => window.removeEventListener("coralgenz_store_updated", refreshData);
   }, []);
 
+  const myEmpId =
+    user?.employeeId ||
+    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
+    "CGG-EMP-0002";
+  const isEmployee = currentRole === "employee";
+  const currentEmployee = employees.find((e) => e.id === myEmpId) || employees[0];
+
   const filteredAttendance = attendance.filter((a) => {
+    if (isEmployee) {
+      if (a.employeeId !== myEmpId && a.employeeName !== user?.displayName) return false;
+    }
     const matchesDate = !selectedDate || a.date === selectedDate;
     const matchesDept = selectedDept === "all" || a.departmentId === selectedDept;
     const matchesStatus = selectedStatus === "all" || a.status === selectedStatus;

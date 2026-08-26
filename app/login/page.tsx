@@ -98,13 +98,22 @@ export default function LoginPage() {
   const [email, setEmail] = useState("karthick@coralgenz.co.in");
   const [password, setPassword] = useState("Coralgenz@2026");
   const [isLoading, setIsLoading] = useState(false);
-
   const selectedPortal = PORTALS.find((p) => p.id === activePortal) || PORTALS[0];
+
+  const DEMO_EMAILS = [
+    "karthick@coralgenz.co.in",
+    "hr@coralgenz.co.in",
+    "payroll@coralgenz.co.in",
+    "manager@coralgenz.co.in",
+    "employee@coralgenz.co.in",
+  ];
 
   const handleSelectPortal = (portal: PortalConfig) => {
     setActivePortal(portal.id);
-    setEmail(portal.email);
-    setPassword("Coralgenz@2026");
+    if (!email || DEMO_EMAILS.includes(email.toLowerCase().trim())) {
+      setEmail(portal.email);
+      setPassword("Coralgenz@2026");
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

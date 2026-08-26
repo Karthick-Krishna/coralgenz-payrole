@@ -42,7 +42,12 @@ import {
   CheckCircle2,
   Camera,
   Image as ImageIcon,
+  KeyRound,
+  Sparkles,
+  Eye,
+  EyeOff,
 } from "lucide-react";
+import { AuthService } from "@/lib/firebase/auth-service";
 
 interface EmployeeProfileProps {
   employee: Employee;
@@ -78,10 +83,17 @@ export function EmployeeProfile({
   const [showExitModal, setShowExitModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Photo state
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState(employee.avatarUrl || "");
   const [isPhotoSaving, setIsPhotoSaving] = useState(false);
+
+  // Password Change state
+  const [adminNewPassword, setAdminNewPassword] = useState("");
+  const [adminConfirmPassword, setAdminConfirmPassword] = useState("");
+  const [showAdminPass, setShowAdminPass] = useState(false);
+  const [isPasswordSaving, setIsPasswordSaving] = useState(false);
 
   // Salary Revision Form State
   const [newSalary, setNewSalary] = useState(employee.currentMonthlyGross);
@@ -96,6 +108,53 @@ export function EmployeeProfile({
   const [resignationDate, setResignationDate] = useState(new Date().toISOString().split("T")[0]);
   const [lastDay, setLastDay] = useState(new Date().toISOString().split("T")[0]);
   const [exitReason, setExitReason] = useState("Career Growth / Better Opportunity");
+
+  const generateRandomPassword = () => {
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$";
+    let pass = "";
+    for (let i = 0; i < 10; i++) {
+      pass += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    setAdminNewPassword(pass);
+    setAdminConfirmPassword(pass);
+    success("Password Generated", `Generated secure password: ${pass}`);
+  };
+
+  const handlePasswordChangeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!adminNewPassword || adminNewPassword.length < 6) {
+      error("Weak Password", "Password must be at least 6 characters long.");
+      return;
+    }
+    if (adminNewPassword !== adminConfirmPassword) {
+      error("Password Mismatch", "New Password and Confirm Password do not match.");
+      return;
+    }
+
+    setIsPasswordSaving(true);
+    try {
+      const res = await AuthService.updatePassword({
+        email: employee.email,
+        newPassword: adminNewPassword,
+        employeeId: employee.id,
+        changedByName: "Super Admin",
+      });
+
+      if (res.success) {
+        success("Password Updated", `Successfully updated portal login password for ${employee.firstName} (${employee.email}) on the server.`);
+        setShowPasswordModal(false);
+        setAdminNewPassword("");
+        setAdminConfirmPassword("");
+        if (onRefresh) onRefresh();
+      } else {
+        error("Update Failed", res.message);
+      }
+    } catch (err: unknown) {
+      error("Error Updating Password", err instanceof Error ? err.message : "Failed to update password on server.");
+    } finally {
+      setIsPasswordSaving(false);
+    }
+  };
 
   const handleSalaryRevisionSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -320,6 +379,14 @@ export function EmployeeProfile({
                 leftIcon={<Upload className="w-4 h-4 text-blue-500" />}
               >
                 Upload Document
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowPasswordModal(true)}
+                leftIcon={<KeyRound className="w-4 h-4 text-sky-500" />}
+              >
+                Change Password
               </Button>
               <Button
                 variant="outline"
@@ -956,6 +1023,85 @@ export function EmployeeProfile({
             </Button>
           </div>
         </div>
+      </Modal>
+
+      {/* MODAL 5: CHANGE LOGIN PASSWORD */}
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+        title="Change Employee Login Password"
+        description={`Set a new portal password for ${employee.firstName} ${employee.lastName} (${employee.email})`}
+      >
+        <form onSubmit={handlePasswordChangeSubmit} className="space-y-4">
+          <div className="p-3 bg-sky-50 dark:bg-sky-950/40 rounded-xl border border-sky-200 dark:border-sky-800 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-sky-600 dark:text-sky-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-sky-900 dark:text-sky-200">
+              Updating this password will immediately apply to the employee&apos;s authentication account on the server. The employee will use this new password to sign into the Employee Portal.
+            </p>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-semibold text-slate-700 dark:text-slate-300">Set New Password</span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={generateRandomPassword}
+              leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
+            >
+              Generate Strong Password
+            </Button>
+          </div>
+
+          <div className="space-y-3">
+            <div className="relative">
+              <Input
+                label="New Password"
+                type={showAdminPass ? "text" : "password"}
+                required
+                value={adminNewPassword}
+                onChange={(e) => setAdminNewPassword(e.target.value)}
+                placeholder="Minimum 6 characters"
+              />
+              <button
+                type="button"
+                onClick={() => setShowAdminPass(!showAdminPass)}
+                className="absolute right-3 top-9 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                {showAdminPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+
+            <Input
+              label="Confirm New Password"
+              type={showAdminPass ? "text" : "password"}
+              required
+              value={adminConfirmPassword}
+              onChange={(e) => setAdminConfirmPassword(e.target.value)}
+              placeholder="Repeat new password"
+            />
+          </div>
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPasswordModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="coral"
+              size="sm"
+              isLoading={isPasswordSaving}
+              leftIcon={<KeyRound className="w-4 h-4" />}
+            >
+              Update Password on Server
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

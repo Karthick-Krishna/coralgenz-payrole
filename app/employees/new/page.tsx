@@ -12,25 +12,34 @@ function EmployeeFormContent() {
   const searchParams = useSearchParams();
   const editId = searchParams?.get("editId");
 
-  const [initialData, setInitialData] = useState<Employee | undefined>(undefined);
-  const [departments, setDepartments] = useState<Department[]>([]);
-  const [designations, setDesignations] = useState<Designation[]>([]);
-  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [initialData, setInitialData] = useState<Employee | undefined>(() => {
+    if (!editId) return undefined;
+    return MockDataStore.getEmployeeById(editId) || undefined;
+  });
+  const [departments, setDepartments] = useState<Department[]>(() => MockDataStore.getDepartments());
+  const [designations, setDesignations] = useState<Designation[]>(() => MockDataStore.getDesignations());
+  const [allEmployees, setAllEmployees] = useState<Employee[]>(() => MockDataStore.getEmployees());
 
-  useEffect(() => {
+  const loadData = () => {
     setDepartments(MockDataStore.getDepartments());
     setDesignations(MockDataStore.getDesignations());
-    const emps = MockDataStore.getEmployees();
-    setAllEmployees(emps);
+    setAllEmployees(MockDataStore.getEmployees());
 
     if (editId) {
       const emp = MockDataStore.getEmployeeById(editId);
       if (emp) setInitialData(emp);
     }
+  };
+
+  useEffect(() => {
+    loadData();
+    window.addEventListener("coralgenz_store_updated", loadData);
+    return () => window.removeEventListener("coralgenz_store_updated", loadData);
   }, [editId]);
 
   return (
     <EmployeeForm
+      key={initialData?.id || editId || "new-employee"}
       initialData={initialData}
       departments={departments}
       designations={designations}

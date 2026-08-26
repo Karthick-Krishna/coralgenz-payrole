@@ -567,6 +567,8 @@ export interface AuditLog {
     | 'reject_request'
     | 'role_delegation'
     | 'create_user'
+    | 'update_user'
+    | 'update_password'
     | 'delete_user';
   module:
     | 'auth'

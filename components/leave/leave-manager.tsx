@@ -91,7 +91,11 @@ export function LeaveManager({
       return;
     }
 
-    const emp = employees.find((e) => e.id === selectedEmployeeId) || employees[0];
+    const targetEmpId = currentRole === "employee" ? myEmpId : selectedEmployeeId;
+    const emp =
+      employees.find((e) => e.id === targetEmpId) ||
+      employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase()) ||
+      employees[0];
 
     MockDataStore.submitLeaveRequest({
       organizationId: "org-coralgenz-01",
@@ -136,14 +140,23 @@ export function LeaveManager({
     refreshData();
   };
 
+  const myEmpId =
+    user?.employeeId ||
+    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
+    "CGG-EMP-0002";
+  const isEmployee = currentRole === "employee";
+
   const filteredRequests = requests.filter((r) => {
+    if (isEmployee) {
+      if (r.employeeId !== myEmpId && r.employeeName !== user?.displayName) return false;
+    }
     if (statusFilter === "all") return true;
     return r.status === statusFilter;
   });
 
   // Current user's leave balance
   const currentBalance =
-    balances.find((b) => b.employeeId === (user?.employeeId || "CGG-EMP-0002")) ||
+    balances.find((b) => b.employeeId === myEmpId) ||
     balances[0];
 
   const statusVariants: Record<LeaveRequest["status"], { variant: "success" | "warning" | "danger" | "secondary"; label: string }> = {

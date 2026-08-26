@@ -13,7 +13,10 @@ export default function PayslipsPage() {
 
   const loadData = () => {
     if (currentRole === "employee") {
-      const myId = user?.employeeId || "CGG-EMP-0002";
+      const myId =
+        user?.employeeId ||
+        MockDataStore.getEmployees().find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
+        "CGG-EMP-0002";
       setPayslips(MockDataStore.getPayslips(myId));
     } else {
       setPayslips(MockDataStore.getPayslips());
