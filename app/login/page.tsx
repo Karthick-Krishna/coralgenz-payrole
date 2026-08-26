@@ -174,7 +174,7 @@ export default function LoginPage() {
                   onClick={() => handleQuickDemoLogin("manager")}
                   className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200"
                 >
-                  👔 Manager
+                  👔 Team Lead
                   <span className="block text-[10px] text-slate-400 font-normal truncate">
                     Sarvesh
                   </span>
@@ -185,9 +185,9 @@ export default function LoginPage() {
                   onClick={() => handleQuickDemoLogin("employee")}
                   className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200 col-span-2 sm:col-span-2"
                 >
-                  👩‍💻 Common Employee
+                  👩‍💻 Employee Self-Service
                   <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Diya Raj (Punch in, Leaves, Payslips)
+                    Employee Portal (Punch in, Leaves, Payslips)
                   </span>
                 </button>
               </div>
