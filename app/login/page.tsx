@@ -154,7 +154,7 @@ export default function LoginPage() {
                 >
                   💼 HR Admin
                   <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Meera Krishnan
+                    Karthick Krishna
                   </span>
                 </button>
 
@@ -165,7 +165,7 @@ export default function LoginPage() {
                 >
                   📊 Payroll Mgr
                   <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Rahul Menon
+                    Thanvanth H
                   </span>
                 </button>
 
@@ -174,9 +174,9 @@ export default function LoginPage() {
                   onClick={() => handleQuickDemoLogin("manager")}
                   className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200"
                 >
-                  👔 Team Lead
+                  👔 Manager
                   <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Aarav Kumar
+                    Sarvesh
                   </span>
                 </button>
 
@@ -185,7 +185,7 @@ export default function LoginPage() {
                   onClick={() => handleQuickDemoLogin("employee")}
                   className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200 col-span-2 sm:col-span-2"
                 >
-                  👩‍💻 Employee Self-Service
+                  👩‍💻 Common Employee
                   <span className="block text-[10px] text-slate-400 font-normal truncate">
                     Diya Raj (Punch in, Leaves, Payslips)
                   </span>

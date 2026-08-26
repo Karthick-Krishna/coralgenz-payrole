@@ -110,7 +110,7 @@ function createInitialAttendanceAndPayroll(): {
     approvedByName: "Karthick Krishna",
     approvedAt: "2026-08-01T12:00:00.000Z",
     lockedBy: "usr-payroll-01",
-    lockedByName: "Rahul Menon",
+    lockedByName: "Thanvanth H",
     lockedAt: "2026-08-01T14:30:00.000Z",
     createdAt: "2026-07-30T10:00:00.000Z",
     updatedAt: "2026-08-01T14:30:00.000Z",

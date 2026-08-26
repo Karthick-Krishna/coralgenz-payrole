@@ -95,7 +95,7 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
       const result = MockDataStore.approveAndLockPayrollRun(
         generatedRun.id,
         user?.id || "usr-payroll-01",
-        user?.displayName || "Rahul Menon"
+        user?.displayName || "Thanvanth H"
       );
 
       if (result) {

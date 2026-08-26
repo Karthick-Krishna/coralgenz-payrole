@@ -47,7 +47,7 @@ export function SalaryStructureView({ initialStructure }: SalaryStructureViewPro
 
       MockDataStore.logAudit({
         userId: "usr-payroll-01",
-        userName: "Rahul Menon",
+        userName: "Thanvanth H",
         userRole: "payroll_manager",
         action: "update_settings",
         module: "settings",

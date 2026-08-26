@@ -70,11 +70,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ### 3. Instant Demo Login
 On the `/login` screen, click any of the **1-Click Test Demo Roles** buttons:
-- 👑 **Super Admin**: `superadmin@coralgenz.com` (Karthick Krishna - Full access)
-- 💼 **HR Admin**: `hr@coralgenz.com` (Meera Krishnan - Employees, Leaves, Attendance)
-- 📊 **Payroll Manager**: `payroll@coralgenz.com` (Rahul Menon - Salary structures, Payroll engine, Locking)
-- 👔 **Team Manager**: `manager@coralgenz.com` (Aarav Kumar - Team roster, Leave approvals)
-- 👩‍💻 **Employee**: `employee@coralgenz.com` (Diya Raj - Check-in/out, Apply leave, Download payslips)
+- 👑 **Super Admin**: `superadmin@coralgenz.com` (Karthick Krishna - Full unrestricted access)
+- 💼 **HR Admin**: `hr@coralgenz.com` (Karthick Krishna - Employees, Leaves, Attendance, Org structure)
+- 📊 **Payroll Manager**: `payroll@coralgenz.com` (Thanvanth H - Salary structures, Indian statutory compliance, Payroll engine & Locking)
+- 👔 **Team Manager**: `manager@coralgenz.com` (Sarvesh - Team roster, Leave approvals)
+- 👩‍💻 **Common Employee**: `employee@coralgenz.com` (Diya Raj - Biometric check-in/out, Apply leave, Download payslips)
 
 ---
 

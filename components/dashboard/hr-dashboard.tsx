@@ -50,11 +50,11 @@ export function HRDashboard({
   const pendingLeaves = leaveRequests.filter((l) => l.status === "pending");
 
   const handleApproveLeave = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(reqId, "approved", "usr-hr-01", "Meera Krishnan", "Approved by HR");
+    MockDataStore.updateLeaveStatus(reqId, "approved", "usr-hr-01", "Karthick Krishna", "Approved by HR");
   };
 
   const handleRejectLeave = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(reqId, "rejected", "usr-hr-01", "Meera Krishnan", "Rejected by HR");
+    MockDataStore.updateLeaveStatus(reqId, "rejected", "usr-hr-01", "Karthick Krishna", "Rejected by HR");
   };
 
   return (
