@@ -29,6 +29,12 @@ export type Permission =
   | "leave.view_all"
   | "leave.approve"
   | "leave.manage_quota"
+  // Requests & Claims (ESS)
+  | "requests.view_self"
+  | "requests.create"
+  | "requests.view_all"
+  | "requests.approve"
+  | "requests.reject"
   // Payroll & Salary Structures
   | "payroll.view_all"
   | "payroll.calculate"
@@ -88,6 +94,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "leave.view_all",
     "leave.approve",
     "leave.manage_quota",
+    "requests.view_self",
+    "requests.create",
+    "requests.view_all",
+    "requests.approve",
+    "requests.reject",
     "payroll.view_all",
     "payroll.calculate",
     "payroll.review",
@@ -139,6 +150,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "leave.view_all",
     "leave.approve",
     "leave.manage_quota",
+    "requests.view_self",
+    "requests.create",
+    "requests.view_all",
+    "requests.approve",
+    "requests.reject",
     "payroll.view_all",
     "payroll.calculate",
     "payroll.review",
@@ -167,6 +183,11 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "attendance.view_all",
     "leave.view_self",
     "leave.view_all",
+    "requests.view_self",
+    "requests.create",
+    "requests.view_all",
+    "requests.approve",
+    "requests.reject",
     "payroll.view_all",
     "payroll.calculate",
     "payroll.review",
@@ -194,6 +215,10 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "leave.apply",
     "leave.view_team",
     "leave.approve",
+    "requests.view_self",
+    "requests.create",
+    "requests.view_all",
+    "requests.approve",
     "payslips.view_self",
     "payslips.download",
     "reports.view_team",
@@ -205,6 +230,8 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     "attendance.checkin_checkout",
     "leave.view_self",
     "leave.apply",
+    "requests.view_self",
+    "requests.create",
     "payslips.view_self",
     "payslips.download",
     "calendar.view",
@@ -235,6 +262,8 @@ export function canAccessModule(role: UserRole | undefined, moduleName: string):
       return hasPermission(role, "attendance.view_self") || hasPermission(role, "attendance.view_all");
     case "leave":
       return hasPermission(role, "leave.view_self") || hasPermission(role, "leave.view_all");
+    case "requests":
+      return hasPermission(role, "requests.view_self") || hasPermission(role, "requests.view_all");
     case "payroll":
       return hasPermission(role, "payroll.view_all");
     case "payslips":

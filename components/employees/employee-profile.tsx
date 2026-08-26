@@ -12,6 +12,7 @@ import { Modal } from "@/components/ui/modal";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/lib/auth/auth-context";
 import {
   formatINR,
   formatDate,
@@ -39,6 +40,8 @@ import {
   DollarSign,
   UserMinus,
   CheckCircle2,
+  Camera,
+  Image as ImageIcon,
 } from "lucide-react";
 
 interface EmployeeProfileProps {
@@ -48,6 +51,15 @@ interface EmployeeProfileProps {
   onRefresh?: () => void;
 }
 
+const PRESET_AVATARS = [
+  { id: "p1", name: "Executive 1", url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80" },
+  { id: "p2", name: "Executive 2", url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80" },
+  { id: "p3", name: "Executive 3", url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80" },
+  { id: "p4", name: "Executive 4", url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80" },
+  { id: "p5", name: "Executive 5", url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80" },
+  { id: "p6", name: "Executive 6", url: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80" },
+];
+
 export function EmployeeProfile({
   employee,
   department,
@@ -55,13 +67,21 @@ export function EmployeeProfile({
   onRefresh,
 }: EmployeeProfileProps) {
   const router = useRouter();
+  const { currentRole } = useAuth();
   const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState("overview");
+
+  const canManagePhotos = currentRole === "super_admin" || currentRole === "hr_admin";
 
   // Modals state
   const [showRevisionModal, setShowRevisionModal] = useState(false);
   const [showExitModal, setShowExitModal] = useState(false);
   const [showDocModal, setShowDocModal] = useState(false);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+
+  // Photo state
+  const [selectedPhotoUrl, setSelectedPhotoUrl] = useState(employee.avatarUrl || "");
+  const [isPhotoSaving, setIsPhotoSaving] = useState(false);
 
   // Salary Revision Form State
   const [newSalary, setNewSalary] = useState(employee.currentMonthlyGross);
@@ -175,6 +195,41 @@ export function EmployeeProfile({
     if (onRefresh) onRefresh();
   };
 
+  const handleSavePhoto = (photoUrlToSave?: string) => {
+    const url = photoUrlToSave !== undefined ? photoUrlToSave : selectedPhotoUrl;
+    setIsPhotoSaving(true);
+    MockDataStore.updateEmployee(employee.id, {
+      avatarUrl: url || undefined,
+    });
+
+    MockDataStore.logAudit({
+      userId: "usr-superadmin-01",
+      userName: "Super Admin",
+      userRole: "super_admin",
+      action: "update_employee",
+      module: "employee",
+      recordId: employee.id,
+      recordTitle: `${employee.firstName} ${employee.lastName}`,
+      details: `Updated employee profile photo for ${employee.firstName} ${employee.lastName}`,
+    });
+
+    success("Profile Photo Updated", `Saved profile photo for ${employee.firstName} ${employee.lastName}`);
+    setIsPhotoSaving(false);
+    setShowPhotoModal(false);
+    if (onRefresh) onRefresh();
+  };
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const base64 = event.target?.result as string;
+      setSelectedPhotoUrl(base64);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const tabs = [
     { id: "overview", label: "Overview & Personal", icon: <User className="w-4 h-4" /> },
     { id: "financial", label: "Financial & Compensation", icon: <CreditCard className="w-4 h-4" /> },
@@ -186,13 +241,33 @@ export function EmployeeProfile({
     <div className="space-y-6">
       {/* Profile Header Hero Card */}
       <Card className="overflow-hidden border-slate-200/80 dark:border-slate-800">
-        <div className="h-32 bg-gradient-to-r from-slate-900 via-slate-800 to-coral-900 relative" />
+        <div className="h-32 bg-gradient-to-r from-slate-900 via-sky-900 to-blue-900 relative" />
         <div className="px-6 pb-6 pt-0 relative">
           <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12">
             <div className="flex items-end gap-4">
-              <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-coral-500 to-amber-500 text-white font-bold text-2xl flex items-center justify-center border-4 border-white dark:border-slate-900 shadow-xl shrink-0">
-                {getInitials(`${employee.firstName} ${employee.lastName}`)}
+              <div className="relative group">
+                <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-2xl flex items-center justify-center border-4 border-white dark:border-slate-900 shadow-xl shrink-0 overflow-hidden">
+                  {employee.avatarUrl ? (
+                    <img src={employee.avatarUrl} alt={employee.firstName} className="w-full h-full object-cover" />
+                  ) : (
+                    getInitials(`${employee.firstName} ${employee.lastName}`)
+                  )}
+                </div>
+
+                {canManagePhotos && (
+                  <button
+                    onClick={() => {
+                      setSelectedPhotoUrl(employee.avatarUrl || "");
+                      setShowPhotoModal(true);
+                    }}
+                    title="Change Profile Photo (Super Admin / HR)"
+                    className="absolute -bottom-1 -right-1 p-2 rounded-xl bg-sky-600 text-white hover:bg-sky-500 shadow-lg border-2 border-white dark:border-slate-900 transition-all hover:scale-110 flex items-center justify-center"
+                  >
+                    <Camera className="w-4 h-4" />
+                  </button>
+                )}
               </div>
+
               <div className="space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
@@ -217,6 +292,19 @@ export function EmployeeProfile({
 
             {/* Actions Toolbar */}
             <div className="flex flex-wrap items-center gap-2">
+              {canManagePhotos && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSelectedPhotoUrl(employee.avatarUrl || "");
+                    setShowPhotoModal(true);
+                  }}
+                  leftIcon={<Camera className="w-4 h-4 text-sky-500" />}
+                >
+                  Set Photo
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -762,6 +850,112 @@ export function EmployeeProfile({
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL: SET PROFILE PHOTO (FOR SUPER ADMIN / HR ADMIN) */}
+      <Modal
+        isOpen={showPhotoModal}
+        onClose={() => setShowPhotoModal(false)}
+        title="Set Employee Profile Photo"
+        description={`Upload or choose a corporate profile photo for ${employee.firstName} ${employee.lastName}`}
+      >
+        <div className="space-y-5">
+          {/* Current Preview */}
+          <div className="flex items-center gap-4 p-4 rounded-2xl bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800">
+            <div className="w-20 h-20 rounded-2xl bg-white border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 shadow-md flex items-center justify-center">
+              {selectedPhotoUrl ? (
+                <img src={selectedPhotoUrl} alt="Preview" className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-xl font-bold text-sky-600">
+                  {getInitials(`${employee.firstName} ${employee.lastName}`)}
+                </span>
+              )}
+            </div>
+            <div className="space-y-1">
+              <span className="font-bold text-xs text-slate-800 dark:text-slate-200">
+                Photo Preview
+              </span>
+              <p className="text-[11px] text-slate-500">
+                Select a preset, upload from your computer, or paste a custom image URL.
+              </p>
+              {selectedPhotoUrl && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedPhotoUrl("")}
+                  className="text-[11px] text-rose-500 hover:underline font-semibold block"
+                >
+                  Remove Photo (Reset to Initials)
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Option 1: Preset Corporate Portraits */}
+          <div className="space-y-2">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Choose from Corporate Portrait Presets:
+            </label>
+            <div className="grid grid-cols-6 gap-2">
+              {PRESET_AVATARS.map((p) => {
+                const isSelected = selectedPhotoUrl === p.url;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => setSelectedPhotoUrl(p.url)}
+                    className={`w-12 h-12 rounded-xl overflow-hidden border-2 transition-all hover:scale-105 ${
+                      isSelected ? "border-sky-500 ring-2 ring-sky-300 shadow-md" : "border-slate-200 dark:border-slate-700 opacity-75 hover:opacity-100"
+                    }`}
+                  >
+                    <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Option 2: Upload Device File */}
+          <div className="space-y-1.5">
+            <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Upload from Device:
+            </label>
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileUpload}
+              className="block w-full text-xs text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100"
+            />
+          </div>
+
+          {/* Option 3: Direct URL */}
+          <Input
+            label="Or Enter Direct Photo URL"
+            value={selectedPhotoUrl}
+            onChange={(e) => setSelectedPhotoUrl(e.target.value)}
+            placeholder="https://images.unsplash.com/..."
+          />
+
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowPhotoModal(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="coral"
+              size="sm"
+              isLoading={isPhotoSaving}
+              onClick={() => handleSavePhoto()}
+              leftIcon={<CheckCircle2 className="w-4 h-4" />}
+            >
+              Save Profile Photo
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

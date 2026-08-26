@@ -561,7 +561,13 @@ export interface AuditLog {
     | 'modify_attendance'
     | 'update_settings'
     | 'create_department'
-    | 'create_announcement';
+    | 'create_announcement'
+    | 'submit_request'
+    | 'approve_request'
+    | 'reject_request'
+    | 'role_delegation'
+    | 'create_user'
+    | 'delete_user';
   module:
     | 'auth'
     | 'employee'
@@ -572,7 +578,8 @@ export interface AuditLog {
     | 'department'
     | 'designation'
     | 'settings'
-    | 'announcement';
+    | 'announcement'
+    | 'requests';
   recordId?: string;
   recordTitle?: string;
   details: string;
@@ -581,3 +588,60 @@ export interface AuditLog {
   ipAddress?: string;
   timestamp: string;
 }
+
+export type EmployeeRequestType =
+  | 'expense_claim'
+  | 'salary_advance'
+  | 'tax_declaration'
+  | 'letter_request'
+  | 'attendance_regularization'
+  | 'resignation';
+
+export type RequestStatus = 'pending' | 'under_review' | 'approved' | 'rejected' | 'disbursed';
+
+export interface EmployeeRequest {
+  id: string;
+  organizationId: string;
+  employeeId: string;
+  employeeCode: string;
+  employeeName: string;
+  departmentId?: string;
+  departmentName?: string;
+  type: EmployeeRequestType;
+  title: string;
+  description: string;
+  amount?: number;
+  status: RequestStatus;
+  payload?: {
+    // Expense Claim
+    expenseCategory?: 'travel' | 'food' | 'internet' | 'training' | 'equipment' | 'other';
+    merchantName?: string;
+    expenseDate?: string;
+    // Salary Advance
+    repaymentMonths?: number;
+    monthlyInstallment?: number;
+    // HR Letter
+    letterType?: 'salary_certificate' | 'bonafide' | 'experience' | 'relieving' | 'address_proof';
+    purpose?: string;
+    // Attendance Regularization
+    regularizationDate?: string;
+    suggestedCheckIn?: string;
+    suggestedCheckOut?: string;
+    regularizationReason?: string;
+    // Tax Declaration
+    section80C?: number;
+    section80D?: number;
+    hraAnnualRent?: number;
+    nps80CCD?: number;
+    homeLoanInterest?: number;
+  };
+  attachmentName?: string;
+  attachmentUrl?: string;
+  reviewerId?: string;
+  reviewerName?: string;
+  reviewerComments?: string;
+  reviewedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

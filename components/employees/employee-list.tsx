@@ -255,8 +255,12 @@ export function EmployeeList({
               <TableRow key={emp.id}>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-coral-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                      {getInitials(`${emp.firstName} ${emp.lastName}`)}
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-sky-100 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                      {emp.avatarUrl ? (
+                        <img src={emp.avatarUrl} alt={emp.firstName} className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(`${emp.firstName} ${emp.lastName}`)
+                      )}
                     </div>
                     <div>
                       <Link

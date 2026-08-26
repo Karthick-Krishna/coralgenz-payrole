@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/table";
 import { formatTime, formatDate } from "@/lib/utils";
 import { exportToCSV } from "@/lib/export/export-utils";
+import { useAuth } from "@/lib/auth/auth-context";
 import { useToast } from "@/components/ui/toast";
 import {
   Clock,
@@ -42,7 +43,9 @@ export function AttendanceTracker({
   employees,
   departments,
 }: AttendanceTrackerProps) {
+  const { currentRole, user } = useAuth();
   const { success, error } = useToast();
+  const canEditAttendance = currentRole === "super_admin" || currentRole === "hr_admin";
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(initialAttendance);
   const [selectedDate, setSelectedDate] = useState("2026-08-26");
   const [selectedDept, setSelectedDept] = useState("all");
@@ -258,13 +261,13 @@ export function AttendanceTracker({
             <TableHead>Overtime</TableHead>
             <TableHead>Status</TableHead>
             <TableHead>Work Mode</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
+            {canEditAttendance && <TableHead className="text-right">Actions</TableHead>}
           </TableRow>
         </TableHeader>
         <TableBody>
           {filteredAttendance.length === 0 ? (
             <tr>
-              <td colSpan={8} className="p-8 text-center text-xs text-slate-400">
+              <td colSpan={canEditAttendance ? 8 : 7} className="p-8 text-center text-xs text-slate-400">
                 No attendance records for the selected date and filters.
               </td>
             </tr>
@@ -322,16 +325,18 @@ export function AttendanceTracker({
                   </span>
                 </TableCell>
 
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleOpenEdit(rec)}
-                    title="Manual Override"
-                  >
-                    <Edit2 className="w-3.5 h-3.5" />
-                  </Button>
-                </TableCell>
+                {canEditAttendance && (
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleOpenEdit(rec)}
+                      title="Manual Override"
+                    >
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </TableCell>
+                )}
               </TableRow>
             ))
           )}

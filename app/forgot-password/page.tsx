@@ -38,8 +38,8 @@ export default function ForgotPasswordPage() {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-slate-100 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-md text-center space-y-2">
-        <div className="w-12 h-12 rounded-2xl bg-coral-500 text-white font-bold text-xl flex items-center justify-center mx-auto shadow-glow">
-          C
+        <div className="w-14 h-14 rounded-2xl bg-white p-1.5 flex items-center justify-center mx-auto shadow-2xl shadow-coral-500/20 overflow-hidden">
+          <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
         </div>
         <h2 className="text-2xl font-bold tracking-tight text-white">
           Reset Your Password

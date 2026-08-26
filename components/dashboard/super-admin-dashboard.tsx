@@ -91,12 +91,12 @@ export function SuperAdminDashboard({
     payroll: d.monthlyPayrollCost,
   }));
 
-  const COLORS = ["#ff5722", "#3b82f6", "#10b981", "#8b5cf6", "#f59e0b", "#06b6d4"];
+  const COLORS = ["#0284c7", "#0ea5e9", "#38bdf8", "#06b6d4", "#3b82f6", "#10b981"];
 
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Welcome Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white shadow-xl relative overflow-hidden border border-slate-700/50">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-sky-950/80 to-slate-900 text-white shadow-xl relative overflow-hidden border border-sky-800/30">
         <div className="space-y-1 relative z-10">
           <div className="flex items-center gap-2">
             <Badge variant="coral" size="sm">

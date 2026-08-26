@@ -23,6 +23,7 @@ import {
   Settings,
   Sparkles,
   ChevronRight,
+  Receipt,
 } from "lucide-react";
 import { UserRole } from "@/types";
 
@@ -39,6 +40,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Employees", href: "/employees", icon: Users, module: "employees" },
   { label: "Attendance", href: "/attendance", icon: Clock, module: "attendance" },
   { label: "Leave", href: "/leave", icon: CalendarCheck, module: "leave" },
+  { label: "Requests & Claims", href: "/requests", icon: Receipt, module: "requests" },
   { label: "Payroll", href: "/payroll", icon: CreditCard, module: "payroll" },
   { label: "Payslips", href: "/payslips", icon: FileSpreadsheet, module: "payslips" },
   { label: "Departments", href: "/departments", icon: Building2, module: "departments" },
@@ -52,7 +54,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname();
-  const { user, currentRole, switchRole, isDemoMode } = useAuth();
+  const { user, currentRole, switchRole, isSuperAdmin, isDemoMode } = useAuth();
 
   const allowedNavItems = NAV_ITEMS.filter((item) =>
     canAccessModule(currentRole, item.module)
@@ -74,8 +76,8 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
     <aside className="w-64 h-screen bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 select-none">
       {/* Brand Header */}
       <div className="p-5 flex items-center gap-3 border-b border-slate-800/80">
-        <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-coral-600 to-coral-400 flex items-center justify-center text-white font-black text-xl shadow-glow">
-          C
+        <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md overflow-hidden shrink-0">
+          <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
@@ -145,29 +147,35 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
         })}
       </div>
 
-      {/* Demo Switcher Quick Bar */}
-      <div className="p-3 border-t border-slate-800/80 bg-slate-950/70 space-y-2">
-        <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 px-1">
-          <Sparkles className="w-3.5 h-3.5 text-coral-400" />
-          <span>Switch Perspective</span>
-        </div>
-        <select
-          value={currentRole}
-          onChange={handleRoleChange}
-          className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-coral-500 cursor-pointer"
-        >
-          <option value="super_admin">👑 Super Admin (Karthick)</option>
-          <option value="hr_admin">💼 HR Admin (Karthick)</option>
-          <option value="payroll_manager">📊 Payroll Mgr (Thanvanth H)</option>
-          <option value="manager">👔 Manager (Sarvesh)</option>
-          <option value="employee">👩‍💻 Employee</option>
-        </select>
-        {isDemoMode && (
-          <div className="text-[10px] text-center text-slate-400 font-mono">
-            Demo Mode Active
+      {/* Super Admin Switcher Quick Bar - ONLY available to Super Admin */}
+      {isSuperAdmin ? (
+        <div className="p-3 border-t border-slate-800/80 bg-slate-950/70 space-y-2">
+          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 px-1">
+            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+            <span>Super Admin Perspective Switcher</span>
           </div>
-        )}
-      </div>
+          <select
+            value={currentRole}
+            onChange={handleRoleChange}
+            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+          >
+            <option value="super_admin">👑 Super Admin (Karthick)</option>
+            <option value="hr_admin">💼 HR Admin (Karthick)</option>
+            <option value="payroll_manager">📊 Payroll Mgr (Thanvanth H)</option>
+            <option value="manager">👔 Manager (Sarvesh)</option>
+            <option value="employee">👩‍💻 Employee</option>
+          </select>
+        </div>
+      ) : (
+        <div className="p-3 border-t border-slate-800/80 bg-slate-950/40 text-center">
+          <p className="text-[10px] text-slate-400">
+            Assigned Portal: <span className="font-semibold text-sky-400 capitalize">{currentRole.replace("_", " ")}</span>
+          </p>
+          <p className="text-[9px] text-slate-400 mt-0.5">
+            Role managed by Super Admin
+          </p>
+        </div>
+      )}
     </aside>
   );
 }

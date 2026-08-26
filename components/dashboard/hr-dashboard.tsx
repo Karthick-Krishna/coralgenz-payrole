@@ -60,7 +60,7 @@ export function HRDashboard({
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-emerald-700 via-teal-700 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-sky-800 via-sky-700 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <Badge variant="success" size="sm" className="bg-white/20 text-white border-none">
             HR Operations Control Center

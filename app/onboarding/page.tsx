@@ -56,8 +56,8 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 text-slate-100 font-sans">
       <div className="sm:mx-auto sm:w-full sm:max-w-xl text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-coral-600 to-coral-400 text-white font-black text-2xl flex items-center justify-center mx-auto shadow-glow">
-          C
+        <div className="w-16 h-16 rounded-2xl bg-white p-2 flex items-center justify-center mx-auto shadow-2xl shadow-coral-500/20 overflow-hidden">
+          <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
         </div>
         <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
           Organization Setup Wizard

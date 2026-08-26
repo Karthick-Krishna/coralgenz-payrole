@@ -68,13 +68,13 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 3. Instant Demo Login
-On the `/login` screen, click any of the **1-Click Test Demo Roles** buttons:
-- 👑 **Super Admin**: `superadmin@coralgenz.com` (Karthick Krishna - Full access)
-- 💼 **HR Admin**: `hr@coralgenz.com` (Karthick Krishna - Employees, Leaves, Attendance)
-- 📊 **Payroll Manager**: `payroll@coralgenz.com` (Thanvanth H - Salary structures, Payroll engine, Locking)
-- 👔 **Team Manager**: `manager@coralgenz.com` (Sarvesh - Team roster, Leave approvals)
-- 👩‍💻 **Employee**: `employee@coralgenz.com` (Employee Portal - Check-in/out, Apply leave, Download payslips)
+### 3. Dedicated Multi-Portal Login Screens
+On the `/login` screen, select your dedicated portal:
+- 👑 **Super Admin**: `karthick@coralgenz.co.in` (Karthick Krishna - Master Control & Role Delegation)
+- 💼 **HR Admin**: `hr@coralgenz.co.in` (Karthick Krishna - Employees, Leaves, Biometrics)
+- 📊 **Payroll Manager**: `payroll@coralgenz.co.in` (Thanvanth H - Salary engine, Compliance PF/ESI/PT/TDS, Locking)
+- 👔 **Team Manager**: `manager@coralgenz.co.in` (Sarvesh - Team roster, Shift tracking, Leave approvals)
+- 👩‍💻 **Employee (ESS)**: `employee@coralgenz.co.in` (Self-Service - Biometric punches, Claims, Advances, Payslips)
 
 ---
 

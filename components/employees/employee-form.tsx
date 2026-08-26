@@ -50,6 +50,7 @@ export function EmployeeForm({
     phone: initialData?.phone || "",
     dateOfBirth: initialData?.dateOfBirth || "1995-01-01",
     gender: initialData?.gender || ("male" as const),
+    avatarUrl: initialData?.avatarUrl || "",
     address: initialData?.address || "",
     city: initialData?.city || "Bengaluru",
     state: initialData?.state || "Karnataka",
@@ -81,7 +82,7 @@ export function EmployeeForm({
 
   const handleChange = (
     field: string,
-    value: string | number
+    value: unknown
   ) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -99,7 +100,8 @@ export function EmployeeForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.firstName || !formData.lastName || !formData.email) {
-      error("Missing Information", "Please enter the required fields (First Name, Last Name, Work Email).");
+      error("Missing Fields", "Please complete all required fields in the personal information tab.");
+      setActiveTab("personal");
       return;
     }
 
@@ -116,6 +118,7 @@ export function EmployeeForm({
         email: formData.email,
         personalEmail: formData.personalEmail,
         phone: formData.phone,
+        avatarUrl: formData.avatarUrl || undefined,
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender as "male" | "female" | "other",
         address: formData.address,
@@ -224,6 +227,63 @@ export function EmployeeForm({
           {/* TAB 1: PERSONAL INFORMATION */}
           {activeTab === "personal" && (
             <div className="space-y-4 animate-in fade-in duration-150">
+              {/* Profile Photo Picker */}
+              <div className="p-4 rounded-2xl bg-sky-50/50 dark:bg-sky-950/20 border border-sky-200 dark:border-sky-800 space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="w-16 h-16 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 overflow-hidden shrink-0 shadow-sm flex items-center justify-center">
+                    {formData.avatarUrl ? (
+                      <img src={formData.avatarUrl} alt="Avatar" className="w-full h-full object-cover" />
+                    ) : (
+                      <User className="w-8 h-8 text-sky-500" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <Input
+                      label="Profile Photo URL / Link"
+                      value={formData.avatarUrl}
+                      onChange={(e) => handleChange("avatarUrl", e.target.value)}
+                      placeholder="https://images.unsplash.com/..."
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <span className="text-[11px] font-semibold text-slate-600 dark:text-slate-400 block">
+                    Or select a corporate portrait preset:
+                  </span>
+                  <div className="flex flex-wrap gap-2">
+                    {[
+                      { name: "Portrait 1", url: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80" },
+                      { name: "Portrait 2", url: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400&auto=format&fit=crop&q=80" },
+                      { name: "Portrait 3", url: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80" },
+                      { name: "Portrait 4", url: "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=400&auto=format&fit=crop&q=80" },
+                      { name: "Portrait 5", url: "https://images.unsplash.com/photo-1580489944761-15a19d654956?w=400&auto=format&fit=crop&q=80" },
+                      { name: "Portrait 6", url: "https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=400&auto=format&fit=crop&q=80" },
+                    ].map((p, idx) => (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => handleChange("avatarUrl", p.url)}
+                        className={`w-10 h-10 rounded-xl overflow-hidden border-2 transition-all hover:scale-105 ${
+                          formData.avatarUrl === p.url ? "border-sky-500 ring-2 ring-sky-300 shadow-md" : "border-slate-200 dark:border-slate-700 opacity-70 hover:opacity-100"
+                        }`}
+                      >
+                        <img src={p.url} alt={p.name} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                    {formData.avatarUrl && (
+                      <button
+                        type="button"
+                        onClick={() => handleChange("avatarUrl", "")}
+                        className="px-2.5 py-1 text-xs text-rose-500 hover:underline font-semibold"
+                      >
+                        Clear Photo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
                   label="First Name"

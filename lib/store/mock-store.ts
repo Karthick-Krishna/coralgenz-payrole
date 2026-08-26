@@ -15,6 +15,8 @@ import {
   AuditLog,
   SalaryStructure,
   User,
+  EmployeeRequest,
+  RequestStatus,
 } from "@/types";
 import {
   DEMO_ORGANIZATION,
@@ -29,6 +31,7 @@ import {
   DEMO_AUDIT_LOGS,
   DEMO_SALARY_STRUCTURE,
   DEMO_USERS,
+  DEMO_REQUESTS,
 } from "@/lib/demo/demo-data";
 import { calculateEmployeePayroll, generatePayslipFromItem } from "@/lib/payroll/engine";
 
@@ -40,6 +43,7 @@ const STORAGE_KEYS = {
   ATTENDANCE: "coralgenz_attendance",
   LEAVE_REQUESTS: "coralgenz_leave_requests",
   LEAVE_BALANCES: "coralgenz_leave_balances",
+  REQUESTS: "coralgenz_requests",
   PAYROLL_RUNS: "coralgenz_payroll_runs",
   PAYROLL_ITEMS: "coralgenz_payroll_items",
   PAYSLIPS: "coralgenz_payslips",
@@ -49,7 +53,7 @@ const STORAGE_KEYS = {
   AUDIT_LOGS: "coralgenz_audit_logs",
   SALARY_STRUCTURES: "coralgenz_salary_structures",
   USERS: "coralgenz_users",
-  INITIALIZED: "coralgenz_store_init_v2",
+  INITIALIZED: "coralgenz_store_init_v3",
 };
 
 /**
@@ -178,6 +182,7 @@ export class MockDataStore {
     localStorage.setItem(STORAGE_KEYS.ATTENDANCE, JSON.stringify(attendance));
     localStorage.setItem(STORAGE_KEYS.LEAVE_BALANCES, JSON.stringify(DEMO_LEAVE_BALANCES));
     localStorage.setItem(STORAGE_KEYS.LEAVE_REQUESTS, JSON.stringify(DEMO_LEAVE_REQUESTS));
+    localStorage.setItem(STORAGE_KEYS.REQUESTS, JSON.stringify(DEMO_REQUESTS));
     localStorage.setItem(STORAGE_KEYS.SALARY_STRUCTURES, JSON.stringify([DEMO_SALARY_STRUCTURE]));
     localStorage.setItem(STORAGE_KEYS.PAYROLL_RUNS, JSON.stringify(payrollRuns));
     localStorage.setItem(STORAGE_KEYS.PAYROLL_ITEMS, JSON.stringify(payrollItems));
@@ -580,6 +585,125 @@ export class MockDataStore {
     return updated;
   }
 
+  // --- EMPLOYEE REQUESTS & CLAIMS (ESS) ---
+  public static getRequests(employeeId?: string): EmployeeRequest[] {
+    const list = this.getItem<EmployeeRequest[]>(STORAGE_KEYS.REQUESTS, DEMO_REQUESTS);
+    if (employeeId) {
+      return list.filter((r) => r.employeeId === employeeId);
+    }
+    return list;
+  }
+
+  public static getRequestById(id: string): EmployeeRequest | undefined {
+    return this.getRequests().find((r) => r.id === id);
+  }
+
+  public static createRequest(
+    data: Omit<EmployeeRequest, "id" | "createdAt" | "updatedAt">
+  ): EmployeeRequest {
+    const list = this.getRequests();
+    const newReq: EmployeeRequest = {
+      ...data,
+      id: `req-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    const updated = [newReq, ...list];
+    this.setItem(STORAGE_KEYS.REQUESTS, updated);
+
+    this.addNotification({
+      userId: "usr-superadmin-01",
+      title: `New ${newReq.type.replace("_", " ").toUpperCase()} Request`,
+      message: `${newReq.employeeName} submitted "${newReq.title}"${newReq.amount ? " (₹" + newReq.amount.toLocaleString("en-IN") + ")" : ""}.`,
+      type: "announcement",
+      link: "/requests",
+    });
+
+    this.logAudit({
+      userId: "system",
+      userName: newReq.employeeName,
+      userRole: "employee",
+      action: "submit_request",
+      module: "requests",
+      recordId: newReq.id,
+      recordTitle: newReq.title,
+      details: `Submitted ${newReq.type} request: ${newReq.title}`,
+    });
+
+    this.notifyChange("requests");
+    return newReq;
+  }
+
+  public static updateRequestStatus(
+    id: string,
+    status: RequestStatus,
+    reviewerId: string,
+    reviewerName: string,
+    comments?: string
+  ): EmployeeRequest | null {
+    const list = this.getRequests();
+    const index = list.findIndex((r) => r.id === id);
+    if (index === -1) return null;
+
+    const req = list[index];
+    const updated: EmployeeRequest = {
+      ...req,
+      status,
+      reviewerId,
+      reviewerName,
+      reviewerComments: comments,
+      reviewedAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    list[index] = updated;
+    this.setItem(STORAGE_KEYS.REQUESTS, list);
+
+    // If attendance regularization is approved, automatically correct the attendance log!
+    if (status === "approved" && req.type === "attendance_regularization" && req.payload?.regularizationDate) {
+      const attList = this.getAttendance();
+      const existingIdx = attList.findIndex(
+        (a) => a.employeeId === req.employeeId && a.date === req.payload?.regularizationDate
+      );
+      if (existingIdx >= 0) {
+        attList[existingIdx] = {
+          ...attList[existingIdx],
+          checkIn: req.payload.suggestedCheckIn || attList[existingIdx].checkIn,
+          checkOut: req.payload.suggestedCheckOut || attList[existingIdx].checkOut,
+          status: "present",
+          manualOverrideBy: reviewerName,
+          manualOverrideReason: `Approved Regularization: ${req.title}`,
+          updatedAt: new Date().toISOString(),
+        };
+        this.setItem(STORAGE_KEYS.ATTENDANCE, attList);
+        this.notifyChange("attendance");
+      }
+    }
+
+    this.addNotification({
+      userId: req.employeeId,
+      title: `Request ${status.toUpperCase()}`,
+      message: `Your request "${req.title}" has been marked as ${status} by ${reviewerName}.`,
+      type: "announcement",
+      link: "/requests",
+    });
+
+    this.logAudit({
+      userId: reviewerId,
+      userName: reviewerName,
+      userRole: "hr_admin",
+      action: status === "approved" ? "approve_request" : "reject_request",
+      module: "requests",
+      recordId: req.id,
+      recordTitle: req.title,
+      details: `${status.toUpperCase()} request for ${req.employeeName}: ${comments || "No remarks"}`,
+    });
+
+    this.notifyChange("requests");
+    return updated;
+  }
+
   // --- PAYROLL & PAYSLIPS ---
   public static getPayrollRuns(): PayrollRun[] {
     return this.getItem<PayrollRun[]>(STORAGE_KEYS.PAYROLL_RUNS, []);
@@ -895,5 +1019,98 @@ export class MockDataStore {
     this.setItem(STORAGE_KEYS.AUDIT_LOGS, [newLog, ...list.slice(0, 199)]); // keep recent 200
     this.notifyChange("audit_logs");
     return newLog;
+  }
+
+  // --- USERS & ACCESS DELEGATION (MANAGED BY SUPER ADMIN) ---
+  public static getUsers(): User[] {
+    return this.getItem<User[]>(STORAGE_KEYS.USERS, DEMO_USERS);
+  }
+
+  public static getUserById(id: string): User | undefined {
+    return this.getUsers().find((u) => u.id === id);
+  }
+
+  public static getUserByEmail(email: string): User | undefined {
+    return this.getUsers().find((u) => u.email.toLowerCase() === email.toLowerCase());
+  }
+
+  public static updateUserRole(userId: string, newRole: User["role"], changedByName = "Super Admin"): User | null {
+    const list = this.getUsers();
+    const index = list.findIndex((u) => u.id === userId);
+    if (index === -1) return null;
+
+    const prevRole = list[index].role;
+    list[index] = {
+      ...list[index],
+      role: newRole,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.setItem(STORAGE_KEYS.USERS, list);
+    this.notifyChange("users");
+
+    this.logAudit({
+      userId: "usr-superadmin-01",
+      userName: changedByName,
+      userRole: "super_admin",
+      action: "role_delegation",
+      module: "auth",
+      recordId: userId,
+      recordTitle: list[index].displayName,
+      details: `Super Admin changed access role for ${list[index].displayName} (${list[index].email}) from ${prevRole} to ${newRole}`,
+    });
+
+    return list[index];
+  }
+
+  public static addUser(userData: Omit<User, "id" | "createdAt" | "updatedAt">): User {
+    const list = this.getUsers();
+    const newUser: User = {
+      ...userData,
+      id: `usr-${Date.now()}`,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      isActive: true,
+    };
+    this.setItem(STORAGE_KEYS.USERS, [...list, newUser]);
+    this.notifyChange("users");
+
+    this.logAudit({
+      userId: "usr-superadmin-01",
+      userName: "Super Admin",
+      userRole: "super_admin",
+      action: "create_user",
+      module: "auth",
+      recordId: newUser.id,
+      recordTitle: newUser.displayName,
+      details: `Super Admin created user account for ${newUser.displayName} with role ${newUser.role}`,
+    });
+
+    return newUser;
+  }
+
+  public static updateUser(id: string, updates: Partial<User>): User | null {
+    const list = this.getUsers();
+    const index = list.findIndex((u) => u.id === id);
+    if (index === -1) return null;
+
+    list[index] = {
+      ...list[index],
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    };
+
+    this.setItem(STORAGE_KEYS.USERS, list);
+    this.notifyChange("users");
+    return list[index];
+  }
+
+  public static deleteUser(id: string): boolean {
+    const list = this.getUsers();
+    const filtered = list.filter((u) => u.id !== id);
+    if (filtered.length === list.length) return false;
+    this.setItem(STORAGE_KEYS.USERS, filtered);
+    this.notifyChange("users");
+    return true;
   }
 }

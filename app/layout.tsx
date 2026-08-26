@@ -8,7 +8,9 @@ export const metadata: Metadata = {
   description:
     "Coralgenz Payrole is a modern, enterprise-grade payroll and workforce management platform for employee management, biometric attendance, leaves, Indian statutory calculations (PF/ESI/PT/TDS), and automated PDF payslips.",
   icons: {
-    icon: "/favicon.ico",
+    icon: "/favicon.png",
+    shortcut: "/favicon.png",
+    apple: "/logo.png",
   },
 };
 

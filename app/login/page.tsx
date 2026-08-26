@@ -13,20 +13,99 @@ import { useToast } from "@/components/ui/toast";
 import {
   Lock,
   Mail,
-  Sparkles,
   ArrowRight,
   ShieldCheck,
   Building2,
+  Users,
+  Briefcase,
+  Sparkles,
+  CreditCard,
+  UserCheck,
+  Shield,
+  KeyRound,
 } from "lucide-react";
+
+interface PortalConfig {
+  id: UserRole;
+  title: string;
+  name: string;
+  email: string;
+  icon: string;
+  badge: string;
+  badgeVariant: "coral" | "purple" | "info" | "warning" | "success";
+  description: string;
+}
+
+const PORTALS: PortalConfig[] = [
+  {
+    id: "super_admin",
+    title: "Super Admin Portal",
+    name: "Karthick Krishna",
+    email: "karthick@coralgenz.co.in",
+    icon: "👑",
+    badge: "Master Control",
+    badgeVariant: "coral",
+    description: "Full master administrative access with role delegation and complete configuration.",
+  },
+  {
+    id: "hr_admin",
+    title: "HR Admin Portal",
+    name: "Karthick Krishna",
+    email: "hr@coralgenz.co.in",
+    icon: "💼",
+    badge: "HR Operations",
+    badgeVariant: "info",
+    description: "Workforce directory, attendance records, leave approvals, and recruitment.",
+  },
+  {
+    id: "payroll_manager",
+    title: "Payroll Manager Portal",
+    name: "Thanvanth H",
+    email: "payroll@coralgenz.co.in",
+    icon: "📊",
+    badge: "Finance & Payroll",
+    badgeVariant: "purple",
+    description: "Salary processing, statutory compliance (PF/ESI/PT/TDS), and payslip generation.",
+  },
+  {
+    id: "manager",
+    title: "Team Manager Portal",
+    name: "Sarvesh",
+    email: "manager@coralgenz.co.in",
+    icon: "👔",
+    badge: "Team Management",
+    badgeVariant: "warning",
+    description: "Department team attendance, shift tracking, and team leave approvals.",
+  },
+  {
+    id: "employee",
+    title: "Employee Portal (ESS)",
+    name: "Workforce Self-Service",
+    email: "employee@coralgenz.co.in",
+    icon: "👩‍💻",
+    badge: "Employee Self-Service",
+    badgeVariant: "success",
+    description: "View payslips, check in/out, submit leave, and apply for expense claims/advances.",
+  },
+];
 
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginAsDemoRole, isDemoMode } = useAuth();
+  const { login } = useAuth();
   const { success, error: toastError } = useToast();
 
-  const [email, setEmail] = useState("superadmin@coralgenz.com");
+  const [activePortal, setActivePortal] = useState<UserRole>("super_admin");
+  const [email, setEmail] = useState("karthick@coralgenz.co.in");
   const [password, setPassword] = useState("Coralgenz@2026");
   const [isLoading, setIsLoading] = useState(false);
+
+  const selectedPortal = PORTALS.find((p) => p.id === activePortal) || PORTALS[0];
+
+  const handleSelectPortal = (portal: PortalConfig) => {
+    setActivePortal(portal.id);
+    setEmail(portal.email);
+    setPassword("Coralgenz@2026");
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,58 +115,100 @@ export default function LoginPage() {
     }
 
     setIsLoading(true);
-    const res = await login(email, password);
+    const res = await login(email, password, activePortal);
     setIsLoading(false);
 
     if (res.success) {
-      success("Welcome Back", "Successfully authenticated to Coralgenz Payrole.");
+      success("Authenticated Successfully", `Welcome to ${selectedPortal.title}.`);
       router.push("/dashboard");
     } else {
-      toastError("Login Failed", res.error || "Invalid login credentials.");
+      toastError("Authentication Failed", res.error || "Invalid credentials or unauthorized portal access.");
     }
   };
 
-  const handleQuickDemoLogin = async (role: UserRole) => {
-    setIsLoading(true);
-    await loginAsDemoRole(role);
-    setIsLoading(false);
-    success(
-      "Demo Session Started",
-      `Logged in as ${role.replace("_", " ").toUpperCase()}`
-    );
-    router.push("/dashboard");
-  };
-
   return (
-    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative overflow-hidden font-sans text-slate-100">
-      {/* Background glow graphics */}
-      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-coral-500/10 rounded-full blur-3xl pointer-events-none" />
+    <div className="min-h-screen bg-slate-950 flex flex-col justify-center py-10 sm:px-6 lg:px-8 relative overflow-hidden font-sans text-slate-100">
+      {/* Background light-blue gradient aura */}
+      <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[900px] h-[450px] bg-sky-500/15 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center space-y-2">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-coral-600 to-coral-400 text-white font-black text-2xl flex items-center justify-center mx-auto shadow-glow">
-          C
+      {/* Brand Header */}
+      <div className="sm:mx-auto sm:w-full sm:max-w-md relative z-10 text-center space-y-2.5">
+        <div className="w-16 h-16 rounded-2xl bg-white p-2.5 flex items-center justify-center mx-auto shadow-2xl shadow-sky-500/20 overflow-hidden border border-sky-200">
+          <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
         </div>
-        <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
+        <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-white">
           Coralgenz Payrole
-        </h2>
+        </h1>
         <p className="text-xs text-slate-400 max-w-sm mx-auto">
-          Smart Payroll & Workforce Management Platform
+          Enterprise Payroll & Role-Based Access Control Platform
         </p>
       </div>
 
-      <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md relative z-10 px-4 sm:px-0 space-y-6">
-        <Card className="border-slate-800 bg-slate-900/90 shadow-2xl backdrop-blur-xl">
+      {/* Main Login Card */}
+      <div className="mt-7 sm:mx-auto sm:w-full sm:max-w-2xl relative z-10 px-4 sm:px-0 space-y-6">
+        <Card className="border-slate-800 bg-slate-900/95 shadow-2xl backdrop-blur-xl overflow-hidden">
+          {/* Top Portal Selection Ribbon */}
+          <div className="p-3 bg-slate-950 border-b border-slate-800">
+            <p className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2 px-1">
+              Select Dedicated Login Portal:
+            </p>
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-1.5">
+              {PORTALS.map((portal) => {
+                const isActive = activePortal === portal.id;
+                return (
+                  <button
+                    key={portal.id}
+                    type="button"
+                    onClick={() => handleSelectPortal(portal)}
+                    className={`py-2 px-2 rounded-xl text-left transition-all border ${
+                      isActive
+                        ? "bg-sky-950/60 border-sky-500 text-white ring-1 ring-sky-400 shadow-md"
+                        : "bg-slate-900/60 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-850"
+                    }`}
+                  >
+                    <div className="flex items-center gap-1.5 text-xs font-bold truncate">
+                      <span>{portal.icon}</span>
+                      <span className="truncate">{portal.title.replace(" Portal", "")}</span>
+                    </div>
+                    <p className="text-[10px] text-slate-400 truncate mt-0.5">{portal.name.split(" ")[0]}</p>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <CardContent className="p-6 sm:p-8 space-y-6">
+            {/* Active Portal Banner */}
+            <div className="p-4 rounded-2xl bg-sky-950/40 border border-sky-800/40 flex items-start gap-3">
+              <div className="text-2xl p-2 rounded-xl bg-slate-900 border border-slate-700 shrink-0">
+                {selectedPortal.icon}
+              </div>
+              <div className="space-y-1 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-extrabold text-sm text-white">
+                    {selectedPortal.title}
+                  </h3>
+                  <Badge variant={selectedPortal.badgeVariant} size="sm">
+                    {selectedPortal.badge}
+                  </Badge>
+                </div>
+                <p className="text-xs text-slate-400">
+                  {selectedPortal.description}
+                </p>
+              </div>
+            </div>
+
+            {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               <Input
-                label="Corporate Email"
+                label="Registered Corporate Email"
                 type="email"
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@coralgenz.com"
-                leftIcon={<Mail className="w-4 h-4" />}
-                className="bg-slate-950/60 border-slate-700 text-white"
+                placeholder="name@coralgenz.co.in"
+                leftIcon={<Mail className="w-4 h-4 text-sky-400" />}
+                className="bg-slate-950/70 border-slate-700 text-white focus:border-sky-500"
               />
 
               <div className="space-y-1.5">
@@ -97,7 +218,7 @@ export default function LoginPage() {
                   </label>
                   <Link
                     href="/forgot-password"
-                    className="text-xs text-coral-400 hover:text-coral-300 font-medium"
+                    className="text-xs text-sky-400 hover:text-sky-300 font-medium"
                   >
                     Forgot password?
                   </Link>
@@ -107,100 +228,44 @@ export default function LoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  leftIcon={<Lock className="w-4 h-4" />}
-                  className="bg-slate-950/60 border-slate-700 text-white"
+                  leftIcon={<Lock className="w-4 h-4 text-sky-400" />}
+                  className="bg-slate-950/70 border-slate-700 text-white focus:border-sky-500"
                 />
+              </div>
+
+              {/* Portal Access Notice */}
+              <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-400 flex items-center gap-2">
+                <KeyRound className="w-4 h-4 text-sky-400 shrink-0" />
+                <span>
+                  {activePortal === "super_admin"
+                    ? "Super Admin login can switch between any portal views in-session."
+                    : "Admin & Employee access is strictly granted and controlled by the Super Admin."}
+                </span>
               </div>
 
               <Button
                 type="submit"
                 variant="coral"
                 isLoading={isLoading}
-                className="w-full font-bold shadow-lg shadow-coral-500/20"
+                className="w-full font-bold shadow-lg shadow-sky-500/20 py-2.5"
                 rightIcon={<ArrowRight className="w-4 h-4" />}
               >
-                Sign In to Workspace
+                Sign In to {selectedPortal.title}
               </Button>
             </form>
-
-            {/* Quick Demo Switcher Container */}
-            <div className="pt-5 border-t border-slate-800 space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-coral-400" />
-                  <span>1-Click Test Demo Roles:</span>
-                </span>
-                <Badge variant="coral" size="sm">
-                  Instant Access
-                </Badge>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin("super_admin")}
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200"
-                >
-                  👑 Super Admin
-                  <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Karthick Krishna
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin("hr_admin")}
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200"
-                >
-                  💼 HR Admin
-                  <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Karthick Krishna
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin("payroll_manager")}
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200"
-                >
-                  📊 Payroll Mgr
-                  <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Thanvanth H
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin("manager")}
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200"
-                >
-                  👔 Team Lead
-                  <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Sarvesh
-                  </span>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => handleQuickDemoLogin("employee")}
-                  className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-700 border border-slate-700/60 text-left transition-all text-xs font-semibold text-slate-200 col-span-2 sm:col-span-2"
-                >
-                  👩‍💻 Employee Self-Service
-                  <span className="block text-[10px] text-slate-400 font-normal truncate">
-                    Employee Portal (Punch in, Leaves, Payslips)
-                  </span>
-                </button>
-              </div>
-            </div>
           </CardContent>
         </Card>
 
-        {/* Footer info */}
-        <div className="text-center text-xs text-slate-500 space-y-1">
-          <p>Coralgenz Technologies Pvt. Ltd. • ISO/IEC 27001 Secure Payroll</p>
-          <div className="flex justify-center gap-4 pt-1">
-            <Link href="/onboarding" className="text-slate-400 hover:text-coral-400 underline">
-              Organization Setup Wizard
+        {/* Corporate Security Footer */}
+        <div className="text-center text-xs text-slate-400 space-y-1">
+          <p>Coralgenz Technologies Pvt. Ltd. • Firebase Secure Cloud Backend</p>
+          <div className="flex justify-center gap-4 pt-1 text-[11px]">
+            <Link href="/onboarding" className="text-slate-400 hover:text-sky-400 underline">
+              Organization Setup
+            </Link>
+            <span>•</span>
+            <Link href="/verify-email" className="text-slate-400 hover:text-sky-400 underline">
+              Verify Account
             </Link>
           </div>
         </div>

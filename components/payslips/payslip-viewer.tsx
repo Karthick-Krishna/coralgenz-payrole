@@ -72,8 +72,8 @@ export function PayslipViewer({ payslip, organization }: PayslipViewerProps) {
         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-slate-200 dark:border-slate-800">
           <div className="space-y-1">
             <div className="flex items-center gap-2.5">
-              <div className="w-9 h-9 rounded-xl bg-coral-500 text-white font-bold flex items-center justify-center text-lg">
-                C
+              <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-sm overflow-hidden shrink-0">
+                <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
               </div>
               <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
                 {organization.name}

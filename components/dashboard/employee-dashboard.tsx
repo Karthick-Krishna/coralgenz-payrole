@@ -20,6 +20,10 @@ import {
   ArrowRight,
   TrendingUp,
   Building,
+  Receipt,
+  CreditCard,
+  FileCheck,
+  FileText,
 } from "lucide-react";
 import {
   Employee,
@@ -102,7 +106,7 @@ export function EmployeeDashboard({
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Welcome Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-coral-600 via-coral-500 to-amber-500 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-sky-700 via-sky-600 to-blue-600 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <Badge variant="secondary" size="sm" className="bg-white/20 text-white border-none">
             Employee Self-Service Portal
@@ -115,15 +119,24 @@ export function EmployeeDashboard({
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <Button
             variant="secondary"
             size="sm"
-            onClick={() => router.push("/leave")}
-            leftIcon={<CalendarCheck className="w-4 h-4" />}
+            onClick={() => router.push("/requests")}
+            leftIcon={<Receipt className="w-4 h-4" />}
             className="bg-white text-coral-600 hover:bg-white/90 border-none shadow-sm"
           >
-            Apply for Leave
+            Submit Request / Claim
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => router.push("/leave")}
+            leftIcon={<CalendarCheck className="w-4 h-4" />}
+            className="text-white border-white/40 hover:bg-white/10"
+          >
+            Apply Leave
           </Button>
           {latestPayslip && (
             <Button
@@ -137,6 +150,61 @@ export function EmployeeDashboard({
             </Button>
           )}
         </div>
+      </div>
+
+      {/* Quick Employee Self-Service Shortcuts */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <button
+          onClick={() => router.push("/requests")}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-coral-400 dark:hover:border-coral-600 transition-all text-left shadow-sm hover:shadow-md flex items-center gap-3"
+        >
+          <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
+            <Receipt className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">Expense Claim</span>
+            <span className="text-[10px] text-slate-400">Bills & Travel</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => router.push("/requests")}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-coral-400 dark:hover:border-coral-600 transition-all text-left shadow-sm hover:shadow-md flex items-center gap-3"
+        >
+          <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center shrink-0">
+            <CreditCard className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">Salary Advance</span>
+            <span className="text-[10px] text-slate-400">Emergency Loan</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => router.push("/requests")}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-coral-400 dark:hover:border-coral-600 transition-all text-left shadow-sm hover:shadow-md flex items-center gap-3"
+        >
+          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0">
+            <FileCheck className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">Tax Declaration</span>
+            <span className="text-[10px] text-slate-400">80C / 80D / Rent</span>
+          </div>
+        </button>
+
+        <button
+          onClick={() => router.push("/requests")}
+          className="p-3.5 rounded-2xl bg-white dark:bg-slate-800/80 border border-slate-200 dark:border-slate-800 hover:border-coral-400 dark:hover:border-coral-600 transition-all text-left shadow-sm hover:shadow-md flex items-center gap-3"
+        >
+          <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+            <FileText className="w-4 h-4" />
+          </div>
+          <div>
+            <span className="font-bold text-xs text-slate-800 dark:text-slate-200 block">HR Letters</span>
+            <span className="text-[10px] text-slate-400">Salary / Bonafide</span>
+          </div>
+        </button>
       </div>
 
       {/* Main Grid: Biometric Punch Clock + Leave Meters */}

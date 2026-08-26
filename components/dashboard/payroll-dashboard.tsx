@@ -36,7 +36,7 @@ export function PayrollDashboard({
   return (
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-purple-900 via-indigo-900 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-purple-800/40">
+      <div className="p-6 rounded-3xl bg-gradient-to-r from-sky-950 via-blue-900 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4 border border-sky-800/40">
         <div className="space-y-1">
           <Badge variant="purple" size="sm" className="bg-white/20 text-white border-none">
             Payroll & Statutory Processing Suite
