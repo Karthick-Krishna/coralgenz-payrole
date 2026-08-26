@@ -1,0 +1,134 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOrgMember(orgId) {
+      return isAuthenticated() && (
+        request.auth.token.organizationId == orgId ||
+        request.auth.token.role == 'super_admin'
+      );
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && request.auth.token.role == 'super_admin';
+    }
+
+    function isHRAdmin(orgId) {
+      return isOrgMember(orgId) && (
+        request.auth.token.role == 'hr_admin' ||
+        request.auth.token.role == 'super_admin'
+      );
+    }
+
+    function isPayrollManager(orgId) {
+      return isOrgMember(orgId) && (
+        request.auth.token.role == 'payroll_manager' ||
+        request.auth.token.role == 'super_admin'
+      );
+    }
+
+    function isSelf(employeeId) {
+      return isAuthenticated() && request.auth.token.employeeId == employeeId;
+    }
+
+    // Organization Scope
+    match /organizations/{orgId} {
+      allow read: if isOrgMember(orgId);
+      allow write: if isSuperAdmin();
+
+      // Users
+      match /users/{userId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isSuperAdmin();
+      }
+
+      // Employees Directory & Profiles
+      match /employees/{employeeId} {
+        allow read: if isOrgMember(orgId);
+        allow create, update, delete: if isHRAdmin(orgId);
+      }
+
+      // Departments & Designations
+      match /departments/{deptId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isHRAdmin(orgId);
+      }
+      match /designations/{desigId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isHRAdmin(orgId);
+      }
+
+      // Attendance Records
+      match /attendance/{attId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isAuthenticated();
+        allow update: if isHRAdmin(orgId);
+      }
+
+      // Leave Requests & Balances
+      match /leaveRequests/{leaveId} {
+        allow read: if isOrgMember(orgId);
+        allow create: if isOrgMember(orgId);
+        allow update: if isHRAdmin(orgId);
+      }
+      match /leaveBalances/{balanceId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isHRAdmin(orgId);
+      }
+
+      // Salary Structures & Payroll Runs
+      match /salaryStructures/{structId} {
+        allow read: if isPayrollManager(orgId);
+        allow write: if isPayrollManager(orgId);
+      }
+      match /payrollRuns/{runId} {
+        allow read: if isPayrollManager(orgId);
+        allow write: if isPayrollManager(orgId);
+      }
+      match /payrollItems/{itemId} {
+        allow read: if isPayrollManager(orgId);
+        allow write: if isPayrollManager(orgId);
+      }
+
+      // Payslips: Employees can read own, Payroll managers can read all
+      match /payslips/{payslipId} {
+        allow read: if isPayrollManager(orgId) || (
+          isOrgMember(orgId) && resource.data.employeeId == request.auth.token.employeeId
+        );
+        allow write: if isPayrollManager(orgId);
+      }
+
+      // Holidays & Announcements
+      match /holidays/{holId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isHRAdmin(orgId);
+      }
+      match /announcements/{annId} {
+        allow read: if isOrgMember(orgId);
+        allow write: if isHRAdmin(orgId);
+      }
+
+      // Notifications
+      match /notifications/{notifId} {
+        allow read: if isAuthenticated() && (
+          resource.data.userId == request.auth.uid ||
+          resource.data.userId == 'all'
+        );
+        allow write: if isAuthenticated();
+      }
+
+      // Immutable Audit Logs (Append-only by server/admins)
+      match /auditLogs/{logId} {
+        allow read: if isSuperAdmin();
+        allow create: if isAuthenticated();
+        allow update, delete: if false; // Immutable
+      }
+    }
+  }
+}
