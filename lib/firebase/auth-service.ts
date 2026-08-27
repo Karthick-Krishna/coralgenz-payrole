@@ -5,6 +5,7 @@ import { initializeApp, getApps, getApp } from "firebase/app";
 import { getAuth, createUserWithEmailAndPassword } from "firebase/auth";
 import { doc, setDoc } from "firebase/firestore";
 import { db, firebaseConfig } from "./config";
+import { cleanFirestoreData } from "./sanitize";
 
 export interface ProvisionUserParams {
   email: string;
@@ -84,7 +85,7 @@ export class AuthService {
 
       // Save directly to Firestore users collection
       if (db && uid) {
-        await setDoc(doc(db, "users", uid), {
+        await setDoc(doc(db, "users", uid), cleanFirestoreData({
           id: uid,
           employeeId: params.employeeId,
           email: cleanEmail,
@@ -97,7 +98,7 @@ export class AuthService {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           createdBy: params.createdBy || "Super Admin",
-        }, { merge: true });
+        }), { merge: true });
       }
 
       return { success: true, uid };

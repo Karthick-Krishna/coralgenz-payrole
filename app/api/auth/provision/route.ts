@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { db, firebaseConfig } from '@/lib/firebase/config';
 import { doc, setDoc, addDoc, collection } from 'firebase/firestore';
+import { cleanFirestoreData } from '@/lib/firebase/sanitize';
 
 export async function POST(request: Request) {
   try {
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
     }
 
     // --- STEP 2: WRITE USER PROFILE TO FIRESTORE (users collection) ---
-    const userPayload = {
+    const userPayload = cleanFirestoreData({
       id: uid,
       employeeId,
       email: cleanEmail,
@@ -119,7 +120,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy,
-    };
+    });
 
     // A. Via Admin Firestore if available
     if (adminDb && typeof adminDb.collection === 'function') {
@@ -140,7 +141,7 @@ export async function POST(request: Request) {
     }
 
     // --- STEP 3: CREATE DEFAULT LEAVE BALANCE IN FIRESTORE ---
-    const leaveBalPayload = {
+    const leaveBalPayload = cleanFirestoreData({
       id: `lb-${employeeId}-2026`,
       organizationId: 'org-coralgenz-01',
       employeeId,
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
       earned: { allocated: 10, used: 0, remaining: 10 },
       unpaid: { used: 0 },
       updatedAt: new Date().toISOString(),
-    };
+    });
 
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
@@ -165,7 +166,7 @@ export async function POST(request: Request) {
     }
 
     // --- STEP 4: RECORD AUDIT LOG IN FIRESTORE ---
-    const auditPayload = {
+    const auditPayload = cleanFirestoreData({
       userId: 'system',
       userName: createdBy,
       userRole: 'super_admin',
@@ -175,7 +176,7 @@ export async function POST(request: Request) {
       recordTitle: `${displayName} (${cleanEmail})`,
       details: `Provisioned credentials for ${displayName} as ${role}. Official login ID: ${cleanEmail}`,
       timestamp: new Date().toISOString(),
-    };
+    });
 
     if (adminDb && typeof adminDb.collection === 'function') {
       try {

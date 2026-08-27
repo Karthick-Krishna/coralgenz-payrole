@@ -4,6 +4,7 @@ import { db, firebaseConfig } from '@/lib/firebase/config';
 import { collection, doc, getDocs, setDoc, addDoc } from 'firebase/firestore';
 import { FirestoreRest } from '@/lib/firebase/firestore-rest';
 import { serverEmployeeCache } from '@/lib/server/employee-store';
+import { cleanFirestoreData } from '@/lib/firebase/sanitize';
 import { Employee, UserRole } from '@/types';
 
 export async function GET() {
@@ -104,13 +105,13 @@ export async function POST(request: Request) {
 
     const nextId = `CGG-EMP-${String(currentCount + 1).padStart(4, '0')}`;
 
-    const newEmp: Employee = {
+    const newEmp: Employee = cleanFirestoreData({
       ...employeeData,
       id: nextId,
       email: cleanEmail,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-    };
+    });
 
     // Store in shared cache
     serverEmployeeCache.set(nextId, newEmp);
@@ -187,7 +188,7 @@ export async function POST(request: Request) {
     }
 
     // 4. Save User Profile in Firestore (users collection)
-    const userPayload = {
+    const userPayload = cleanFirestoreData({
       id: uid,
       employeeId: nextId,
       email: cleanEmail,
@@ -200,7 +201,7 @@ export async function POST(request: Request) {
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
       createdBy,
-    };
+    });
 
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
@@ -214,7 +215,7 @@ export async function POST(request: Request) {
     }
 
     // 5. Save Default Leave Balance in Firestore
-    const leaveBalPayload = {
+    const leaveBalPayload = cleanFirestoreData({
       id: `lb-${nextId}-2026`,
       organizationId: 'org-coralgenz-01',
       employeeId: nextId,
@@ -225,7 +226,7 @@ export async function POST(request: Request) {
       earned: { allocated: 10, used: 0, remaining: 10 },
       unpaid: { used: 0 },
       updatedAt: new Date().toISOString(),
-    };
+    });
 
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
@@ -239,7 +240,7 @@ export async function POST(request: Request) {
     }
 
     // 6. Record Audit Log in Firestore
-    const auditPayload = {
+    const auditPayload = cleanFirestoreData({
       userId: 'system',
       userName: createdBy,
       userRole: 'super_admin',
@@ -249,7 +250,7 @@ export async function POST(request: Request) {
       recordTitle: `${newEmp.firstName} ${newEmp.lastName}`,
       details: `Created new employee profile and provisioned server login credentials for ${cleanEmail} (${newEmp.designationTitle})`,
       timestamp: new Date().toISOString(),
-    };
+    });
 
     if (adminDb && typeof adminDb.collection === 'function') {
       try {

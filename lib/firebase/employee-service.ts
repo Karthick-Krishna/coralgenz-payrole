@@ -1,5 +1,6 @@
 import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
+import { cleanFirestoreData } from './sanitize';
 import { Employee, UserRole } from '@/types';
 
 export interface AddEmployeeOptions {
@@ -88,16 +89,18 @@ export class EmployeeService {
    * Add a new employee profile directly on the Server (bypasses browser permission limits)
    */
   public static async addEmployee(
-    empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>,
+    empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> | Record<string, any>,
     options?: AddEmployeeOptions
   ): Promise<Employee> {
+    const sanitizedEmpData = cleanFirestoreData(empData);
+
     // 1. First priority: Server API route (runs server-side with zero permission issues)
     try {
       const res = await fetch('/api/employees', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          employeeData: empData,
+          employeeData: sanitizedEmpData,
           portalPassword: options?.portalPassword || 'Welcome@2026',
           portalRole: options?.portalRole || 'employee',
           createdBy: options?.createdBy || 'Super Admin',
@@ -111,25 +114,31 @@ export class EmployeeService {
       }
 
       if (!res.ok) {
-        throw new Error(data.error || 'Server failed to save employee.');
+        console.warn('Server API addEmployee returned error:', data.error);
       }
     } catch (apiErr: any) {
-      console.warn('Server API addEmployee notice, attempting direct write:', apiErr.message);
+      console.warn('Server API addEmployee exception, attempting direct write:', apiErr.message);
     }
 
-    // 2. Client Firestore fallback
+    // 2. Client Firestore fallback with sanitized fields
     if (isFirebaseConfigured && db) {
       try {
-        const existingSnapshot = await getDocs(collection(db, this.collectionName));
-        const count = existingSnapshot.size;
+        let count = 0;
+        try {
+          const existingSnapshot = await getDocs(collection(db, this.collectionName));
+          count = existingSnapshot.size;
+        } catch {
+          count = Math.floor(Math.random() * 900) + 10;
+        }
+
         const nextId = `CGG-EMP-${String(count + 1).padStart(4, '0')}`;
 
-        const newEmp: Employee = {
-          ...empData,
+        const newEmp: Employee = cleanFirestoreData({
+          ...sanitizedEmpData,
           id: nextId,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
-        };
+        });
 
         await setDoc(doc(db, this.collectionName, nextId), newEmp);
         return newEmp;
@@ -145,15 +154,16 @@ export class EmployeeService {
   /**
    * Update an existing employee in Firestore
    */
-  public static async updateEmployee(id: string, updates: Partial<Employee>): Promise<boolean> {
+  public static async updateEmployee(id: string, updates: Partial<Employee> | Record<string, any>): Promise<boolean> {
     if (!id) return false;
+    const sanitizedUpdates = cleanFirestoreData(updates);
 
     // 1. Server API route
     try {
       const res = await fetch(`/api/employees/${id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updates),
+        body: JSON.stringify(sanitizedUpdates),
       });
       if (res.ok) return true;
     } catch {
@@ -165,7 +175,7 @@ export class EmployeeService {
       try {
         const docRef = doc(db, this.collectionName, id);
         await updateDoc(docRef, {
-          ...updates,
+          ...sanitizedUpdates,
           updatedAt: new Date().toISOString(),
         });
         return true;
