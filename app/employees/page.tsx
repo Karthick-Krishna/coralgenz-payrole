@@ -6,23 +6,35 @@ import { EmployeeList } from "@/components/employees/employee-list";
 import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Employee, Department, Designation } from "@/types";
+import { useToast } from "@/components/ui/toast";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [designations, setDesignations] = useState<Designation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { success, error: toastError } = useToast();
 
   const loadData = async () => {
     setIsLoading(true);
     // Fetch employees from Firestore
     const emps = await EmployeeService.getEmployees();
     setEmployees(emps);
-    
-    // Departments & Designations can remain mock/local for now unless migrated
     setDepartments(MockDataStore.getDepartments());
     setDesignations(MockDataStore.getDesignations());
     setIsLoading(false);
+  };
+
+  const handleDeleteEmployee = async (id: string) => {
+    try {
+      const res = await EmployeeService.deleteEmployee(id);
+      if (res) {
+        success("Employee Deactivated", "Employee status has been updated to inactive in the database.");
+        await loadData();
+      }
+    } catch (err: any) {
+      toastError("Delete Failed", err?.message || "Could not deactivate employee.");
+    }
   };
 
   useEffect(() => {
@@ -42,6 +54,7 @@ export default function EmployeesPage() {
           employees={employees}
           departments={departments}
           designations={designations}
+          onDeleteEmployee={handleDeleteEmployee}
         />
       )}
     </AppLayout>

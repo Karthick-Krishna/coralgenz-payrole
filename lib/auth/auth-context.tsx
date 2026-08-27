@@ -2,10 +2,9 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { User, UserRole, Organization } from "@/types";
-import { DEMO_ORGANIZATION, DEMO_USERS } from "@/lib/demo/demo-data";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { DEMO_ORGANIZATION } from "@/lib/demo/demo-data";
 import { isFirebaseConfigured, auth as firebaseAuth, db } from "@/lib/firebase/config";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { AuditService } from "@/lib/firebase/audit-service";
 import {
   signInWithEmailAndPassword,
@@ -36,65 +35,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [baseRole, setBaseRole] = useState<UserRole>("employee");
   const [organization, setOrganization] = useState<Organization | null>(DEMO_ORGANIZATION);
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isDemoMode, setIsDemoMode] = useState<boolean>(!isFirebaseConfigured);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
 
   const isSuperAdmin = baseRole === "super_admin" || user?.email?.toLowerCase() === "karthick@coralgenz.co.in";
 
-  // Helper to extract role / profile from Firestore or local store
+  // Pure Server Profile Resolver directly from Firestore
   const resolveUserProfile = async (uid: string, email: string) => {
+    const cleanEmail = email.toLowerCase().trim();
     let role: UserRole = "employee";
     let employeeId = "";
-    let displayName = email.split("@")[0];
+    let displayName = cleanEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     let photoURL: string | undefined = undefined;
 
-    // 1. Try local store first as baseline
-    const storedUser = MockDataStore.getUserByEmail(email);
-    const matchedEmp = MockDataStore.getEmployees().find((e) => e.email?.toLowerCase() === email);
-
-    if (storedUser) {
-      role = storedUser.role;
-      employeeId = storedUser.employeeId || "";
-      displayName = storedUser.displayName || displayName;
-      photoURL = storedUser.photoURL;
-    } else if (matchedEmp) {
-      employeeId = matchedEmp.id;
-      displayName = `${matchedEmp.firstName} ${matchedEmp.lastName}`;
-      photoURL = matchedEmp.avatarUrl;
-      const title = (matchedEmp.designationTitle || "").toLowerCase();
-      if (title.includes("hr")) role = "hr_admin";
-      else if (title.includes("payroll")) role = "payroll_manager";
-      else if (title.includes("manager") || title.includes("lead")) role = "manager";
+    // 1. Super Admin special identity
+    if (cleanEmail === "karthick@coralgenz.co.in") {
+      return {
+        role: "super_admin" as UserRole,
+        employeeId: "CGG-EMP-0001",
+        displayName: "Karthick Krishna",
+        photoURL: "/logo.png",
+      };
     }
 
-    // 2. Try Firestore if permissions allow
     if (isFirebaseConfigured && db) {
       try {
+        // 2. Check Firestore users collection by document ID
         const userDocRef = doc(db, "users", uid);
         const userDoc = await getDoc(userDocRef);
+
         if (userDoc.exists()) {
           const data = userDoc.data();
-          role = data.role || role;
+          role = (data.role as UserRole) || role;
           employeeId = data.employeeId || employeeId;
           displayName = data.displayName || displayName;
           photoURL = data.photoURL || photoURL;
+        } else {
+          // 3. Check Firestore users collection by email query
+          const uQuery = query(collection(db, "users"), where("email", "==", cleanEmail));
+          const uSnap = await getDocs(uQuery);
+          if (!uSnap.empty) {
+            const data = uSnap.docs[0].data();
+            role = (data.role as UserRole) || role;
+            employeeId = data.employeeId || employeeId;
+            displayName = data.displayName || displayName;
+            photoURL = data.photoURL || photoURL;
+          }
         }
-      } catch {
-        // Silently use local store profile on permission error
-      }
-    }
 
-    if (email === "karthick@coralgenz.co.in") {
-      role = "super_admin";
-      displayName = "Karthick Krishna";
-      employeeId = "CGG-EMP-0001";
+        // 4. Check Firestore employees collection to enrich designation and department role
+        const empQuery = query(collection(db, "employees"), where("email", "==", cleanEmail));
+        const empSnap = await getDocs(empQuery);
+        if (!empSnap.empty) {
+          const emp = empSnap.docs[0].data();
+          employeeId = emp.id || employeeId;
+          displayName = `${emp.firstName} ${emp.lastName}`;
+          photoURL = emp.avatarUrl || photoURL;
+
+          const title = (emp.designationTitle || "").toLowerCase();
+          const dept = (emp.departmentName || "").toLowerCase();
+
+          if (title.includes("super admin") || title.includes("founder") || title.includes("director")) {
+            role = "super_admin";
+          } else if (title.includes("hr") || title.includes("human resource") || dept.includes("human resource")) {
+            role = "hr_admin";
+          } else if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || dept.includes("finance")) {
+            role = "payroll_manager";
+          } else if (title.includes("manager") || title.includes("lead") || title.includes("head") || title.includes("vp")) {
+            role = "manager";
+          }
+        }
+      } catch (err: any) {
+        console.warn("Error fetching Firestore user profile:", err?.message || err);
+      }
     }
 
     return { role, employeeId, displayName, photoURL };
   };
 
   useEffect(() => {
-    MockDataStore.initialize();
-    
     if (isFirebaseConfigured && firebaseAuth) {
       const unsubscribe = onAuthStateChanged(firebaseAuth, async (fbUser) => {
         if (fbUser) {
@@ -136,74 +154,86 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const cleanEmail = email.toLowerCase().trim();
 
     try {
-      if (isFirebaseConfigured && firebaseAuth) {
-        try {
-          const userCredential = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, pass);
-          const fbUser = userCredential.user;
-          const profile = await resolveUserProfile(fbUser.uid, cleanEmail);
-
-          const isSuper = cleanEmail === "karthick@coralgenz.co.in";
-          const isPortalAllowed =
-            isSuper ||
-            !expectedPortalRole ||
-            expectedPortalRole === "employee" ||
-            expectedPortalRole === profile.role;
-
-          if (!isPortalAllowed && expectedPortalRole) {
-            await fbSignOut(firebaseAuth);
-            setIsLoading(false);
-            return {
-              success: false,
-              error: `Access Denied: Your account role is '${profile.role}'. Please switch to the appropriate portal.`,
-            };
-          }
-
-          const activeRole: UserRole = isSuper
-            ? (expectedPortalRole || "super_admin")
-            : (expectedPortalRole === "employee" ? "employee" : profile.role);
-
-          const loggedUser: User = {
-            id: fbUser.uid,
-            email: fbUser.email || cleanEmail,
-            displayName: profile.displayName,
-            role: activeRole,
-            employeeId: profile.employeeId,
-            organizationId: "org-coralgenz-01",
-            photoURL: fbUser.photoURL || profile.photoURL,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-          };
-
-          setUser(loggedUser);
-          setBaseRole(isSuper ? "super_admin" : activeRole);
-          setIsDemoMode(false);
-          setIsLoading(false);
-
-          AuditService.logAction({
-            userId: loggedUser.id,
-            userName: loggedUser.displayName,
-            userRole: loggedUser.role,
-            action: "login",
-            module: "auth",
-            details: `User ${loggedUser.displayName} logged in to ${loggedUser.role} portal.`,
-          });
-
-          return { success: true };
-        } catch (fbErr: any) {
-          setIsLoading(false);
-          const fbErrorCode = fbErr?.code || "";
-          if (fbErrorCode === "auth/wrong-password" || fbErrorCode === "auth/invalid-credential") {
-            return { success: false, error: "Incorrect password. Please verify your credentials." };
-          }
-          if (fbErrorCode === "auth/too-many-requests") {
-            return { success: false, error: "Access temporarily disabled due to multiple failed login attempts." };
-          }
-          return { success: false, error: fbErr.message || "Authentication failed." };
-        }
-      } else {
+      if (!isFirebaseConfigured || !firebaseAuth) {
         setIsLoading(false);
-        return { success: false, error: "Firebase is not configured properly." };
+        return { success: false, error: "Firebase Authentication is not configured on this instance." };
+      }
+
+      try {
+        const userCredential = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, pass);
+        const fbUser = userCredential.user;
+        const profile = await resolveUserProfile(fbUser.uid, cleanEmail);
+
+        const isSuper = cleanEmail === "karthick@coralgenz.co.in" || profile.role === "super_admin";
+        
+        // Check portal authorization
+        const isPortalAllowed =
+          isSuper ||
+          !expectedPortalRole ||
+          expectedPortalRole === "employee" ||
+          expectedPortalRole === profile.role;
+
+        if (!isPortalAllowed && expectedPortalRole) {
+          await fbSignOut(firebaseAuth);
+          setIsLoading(false);
+          const roleLabels: Record<UserRole, string> = {
+            super_admin: "Super Admin",
+            hr_admin: "HR Administrator",
+            payroll_manager: "Payroll Manager",
+            manager: "Team Manager",
+            employee: "Employee (ESS)",
+          };
+          return {
+            success: false,
+            error: `Access Denied: Your account role is '${roleLabels[profile.role] || profile.role}'. Please switch to the ${roleLabels[profile.role] || profile.role} portal.`,
+          };
+        }
+
+        const activeRole: UserRole = isSuper
+          ? (expectedPortalRole || "super_admin")
+          : (expectedPortalRole === "employee" ? "employee" : profile.role);
+
+        const loggedUser: User = {
+          id: fbUser.uid,
+          email: fbUser.email || cleanEmail,
+          displayName: profile.displayName,
+          role: activeRole,
+          employeeId: profile.employeeId,
+          organizationId: "org-coralgenz-01",
+          photoURL: fbUser.photoURL || profile.photoURL,
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          isActive: true,
+        };
+
+        setUser(loggedUser);
+        setBaseRole(isSuper ? "super_admin" : activeRole);
+        setIsDemoMode(false);
+        setIsLoading(false);
+
+        AuditService.logAction({
+          userId: loggedUser.id,
+          userName: loggedUser.displayName,
+          userRole: loggedUser.role,
+          action: "login",
+          module: "auth",
+          details: `User ${loggedUser.displayName} (${cleanEmail}) authenticated successfully into ${loggedUser.role} portal.`,
+        });
+
+        return { success: true };
+      } catch (fbErr: any) {
+        setIsLoading(false);
+        const fbErrorCode = fbErr?.code || "";
+        if (fbErrorCode === "auth/wrong-password" || fbErrorCode === "auth/invalid-credential") {
+          return { success: false, error: "Incorrect password. Please verify the credentials assigned by your admin." };
+        }
+        if (fbErrorCode === "auth/user-not-found") {
+          return { success: false, error: "No account found for this email. Please ask your HR/Super Admin to onboard you." };
+        }
+        if (fbErrorCode === "auth/too-many-requests") {
+          return { success: false, error: "Account temporarily locked due to multiple failed attempts. Please try again in 5 minutes." };
+        }
+        return { success: false, error: fbErr.message || "Authentication failed." };
       }
     } catch (err: any) {
       setIsLoading(false);
@@ -212,7 +242,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const loginAsDemoRole = async (role: UserRole) => {
-    // Demo helper
+    // Disabled in production
   };
 
   const switchRole = (newRole: UserRole): boolean => {
@@ -234,7 +264,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             userRole: user.role,
             action: "logout",
             module: "auth",
-            details: `User ${user.displayName} logged out.`,
+            details: `User ${user.displayName} signed out.`,
           });
         }
       } catch (e) {
@@ -254,7 +284,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return { success: false, message: err.message || "Failed to send reset email" };
       }
     }
-    return { success: false, message: "Firebase not configured." };
+    return { success: false, message: "Firebase Auth not configured." };
   };
 
   const updateCurrentUser = (updates: Partial<User>) => {

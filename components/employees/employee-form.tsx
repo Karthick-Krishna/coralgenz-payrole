@@ -3,7 +3,6 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Employee, Department, Designation, EmploymentType, EmployeeStatus, UserRole } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { AuthService } from "@/lib/firebase/auth-service";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -96,9 +95,12 @@ export function EmployeeForm({
   // Synchronize form state when initialData is provided or updated
   useEffect(() => {
     if (initialData) {
-      const existingUser = MockDataStore.getUserByEmail(initialData.email);
-      const existingCreds = MockDataStore.getCredentials();
-      const existingPass = existingCreds[initialData.email.toLowerCase()] || "Welcome@2026";
+      const title = (initialData.designationTitle || "").toLowerCase();
+      const dept = (initialData.departmentName || "").toLowerCase();
+      let derivedRole: UserRole = "employee";
+      if (title.includes("hr") || dept.includes("human resource")) derivedRole = "hr_admin";
+      else if (title.includes("payroll") || title.includes("finance")) derivedRole = "payroll_manager";
+      else if (title.includes("manager") || title.includes("lead") || title.includes("head")) derivedRole = "manager";
 
       setFormData({
         firstName: initialData.firstName || "",
@@ -116,9 +118,9 @@ export function EmployeeForm({
         postalCode: initialData.postalCode || "641004",
 
         // Portal Login & Auth Credentials
-        portalPassword: existingPass,
-        portalConfirmPassword: existingPass,
-        portalRole: (existingUser?.role || "employee") as UserRole,
+        portalPassword: "",
+        portalConfirmPassword: "",
+        portalRole: derivedRole,
 
         // Employment
         joiningDate: initialData.joiningDate || new Date().toISOString().split("T")[0],

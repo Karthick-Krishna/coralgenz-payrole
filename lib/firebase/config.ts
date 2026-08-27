@@ -1,4 +1,4 @@
-import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
+import { initializeApp, getApps, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
@@ -25,14 +25,20 @@ let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
 
-if (typeof window !== "undefined" && isFirebaseConfigured) {
+if (isFirebaseConfigured) {
   try {
-    app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+    app = getApps().length > 0 ? getApps()[0] : initializeApp(firebaseConfig);
     auth = getAuth(app);
     db = getFirestore(app);
-    storage = getStorage(app);
+    if (typeof window !== "undefined") {
+      try {
+        storage = getStorage(app);
+      } catch {
+        // Storage optional
+      }
+    }
   } catch (error) {
-    console.warn("Firebase initialization warning (falling back to local demo mode):", error);
+    console.warn("Firebase initialization warning:", error);
   }
 }
 

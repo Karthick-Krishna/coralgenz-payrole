@@ -2,43 +2,6 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Helper functions
-    function isAuthenticated() {
-      return request.auth != null;
-    }
-
-    function isSuperAdmin() {
-      return isAuthenticated() && (
-        request.auth.token.role == 'super_admin' ||
-        request.auth.token.email == 'karthick@coralgenz.co.in'
-      );
-    }
-
-    // Direct root collections access
-    match /users/{userId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
-    }
-
-    match /employees/{employeeId} {
-      allow read: if true;
-      allow write: if isAuthenticated() || isSuperAdmin();
-    }
-
-    match /audit_logs/{logId} {
-      allow read, write: if true;
-    }
-
-    match /organizations/{orgId} {
-      allow read, write: if true;
-
-      match /{document=**} {
-        allow read, write: if true;
-      }
-    }
-
-    // Default fallback rule
     match /{document=**} {
       allow read, write: if true;
     }

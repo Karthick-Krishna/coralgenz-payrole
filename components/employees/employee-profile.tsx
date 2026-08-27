@@ -3,7 +3,8 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Employee, Department, Designation, EmployeeDocument } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { EmployeeService } from "@/lib/firebase/employee-service";
+import { AuditService } from "@/lib/firebase/audit-service";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -156,7 +157,7 @@ export function EmployeeProfile({
     }
   };
 
-  const handleSalaryRevisionSubmit = (e: React.FormEvent) => {
+  const handleSalaryRevisionSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newSalary <= 0) {
       error("Invalid Salary", "Please enter a valid monthly salary amount.");
@@ -176,13 +177,13 @@ export function EmployeeProfile({
 
     const updatedRevisions = [revision, ...(employee.salaryRevisions || [])];
 
-    MockDataStore.updateEmployee(employee.id, {
+    await EmployeeService.updateEmployee(employee.id, {
       currentMonthlyGross: Number(newSalary),
       currentAnnualCtc: Number(newSalary) * 12,
       salaryRevisions: updatedRevisions,
     });
 
-    MockDataStore.logAudit({
+    await AuditService.logAction({
       userId: "usr-superadmin-01",
       userName: "Super Admin",
       userRole: "super_admin",
@@ -198,7 +199,7 @@ export function EmployeeProfile({
     if (onRefresh) onRefresh();
   };
 
-  const handleDocUpload = (e: React.FormEvent) => {
+  const handleDocUpload = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!docName) {
       error("Document Name Required", "Please enter a name for the document.");
@@ -217,7 +218,7 @@ export function EmployeeProfile({
     };
 
     const updatedDocs = [newDoc, ...(employee.documents || [])];
-    MockDataStore.updateEmployee(employee.id, { documents: updatedDocs });
+    await EmployeeService.updateEmployee(employee.id, { documents: updatedDocs });
 
     success("Document Uploaded", `Added ${docName} to employee records.`);
     setDocName("");
@@ -225,7 +226,7 @@ export function EmployeeProfile({
     if (onRefresh) onRefresh();
   };
 
-  const handleExitSubmit = (e: React.FormEvent) => {
+  const handleExitSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
     // Calculate final settlement
@@ -234,7 +235,7 @@ export function EmployeeProfile({
     const pendingSalary = Math.round(dailyRate * 15);
     const totalSettlement = pendingSalary + leaveEncashment;
 
-    MockDataStore.updateEmployee(employee.id, {
+    await EmployeeService.updateEmployee(employee.id, {
       status: "resigned",
       exitInfo: {
         resignationDate,
@@ -254,14 +255,14 @@ export function EmployeeProfile({
     if (onRefresh) onRefresh();
   };
 
-  const handleSavePhoto = (photoUrlToSave?: string) => {
+  const handleSavePhoto = async (photoUrlToSave?: string) => {
     const url = photoUrlToSave !== undefined ? photoUrlToSave : selectedPhotoUrl;
     setIsPhotoSaving(true);
-    MockDataStore.updateEmployee(employee.id, {
+    await EmployeeService.updateEmployee(employee.id, {
       avatarUrl: url || undefined,
     });
 
-    MockDataStore.logAudit({
+    await AuditService.logAction({
       userId: "usr-superadmin-01",
       userName: "Super Admin",
       userRole: "super_admin",

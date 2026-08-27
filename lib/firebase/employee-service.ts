@@ -1,102 +1,115 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query, where, deleteDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
-import { MockDataStore } from '@/lib/store/mock-store';
 import { Employee } from '@/types';
 
 export class EmployeeService {
   private static collectionName = 'employees';
 
+  /**
+   * Fetch all active employees directly from Firestore
+   */
   public static async getEmployees(): Promise<Employee[]> {
-    if (isFirebaseConfigured && db) {
-      try {
-        const q = query(collection(db, this.collectionName), where('status', '!=', 'inactive'));
-        const querySnapshot = await getDocs(q);
-        const employees: Employee[] = [];
-        querySnapshot.forEach((docSnap) => {
-          employees.push(docSnap.data() as Employee);
-        });
-
-        if (employees.length > 0) {
-          return employees;
-        }
-      } catch (error: any) {
-        console.warn('Firestore employee fetch notice (falling back to store):', error?.message || error);
-      }
+    if (!isFirebaseConfigured || !db) {
+      console.error('Firebase is not configured.');
+      return [];
     }
 
-    // Fallback to local store
-    return MockDataStore.getEmployees();
+    try {
+      const q = query(collection(db, this.collectionName));
+      const querySnapshot = await getDocs(q);
+      const employees: Employee[] = [];
+      querySnapshot.forEach((docSnap) => {
+        const data = docSnap.data() as Employee;
+        if (data.status !== 'inactive') {
+          employees.push(data);
+        }
+      });
+
+      // Sort by joining date or ID descending
+      return employees.sort((a, b) => b.id.localeCompare(a.id));
+    } catch (error: any) {
+      console.error('Firestore getEmployees error:', error?.message || error);
+      return [];
+    }
   }
 
+  /**
+   * Get single employee by ID directly from Firestore
+   */
   public static async getEmployeeById(id: string): Promise<Employee | null> {
-    if (isFirebaseConfigured && db) {
-      try {
-        const docRef = doc(db, this.collectionName, id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          return docSnap.data() as Employee;
-        }
-      } catch (error: any) {
-        console.warn('Firestore employee lookup notice (falling back to store):', error?.message || error);
-      }
+    if (!isFirebaseConfigured || !db || !id) {
+      return null;
     }
 
-    // Fallback to local store
-    return MockDataStore.getEmployeeById(id) || null;
+    try {
+      const docRef = doc(db, this.collectionName, id);
+      const docSnap = await getDoc(docRef);
+      if (docSnap.exists()) {
+        return docSnap.data() as Employee;
+      }
+      return null;
+    } catch (error: any) {
+      console.error(`Firestore getEmployeeById (${id}) error:`, error?.message || error);
+      return null;
+    }
   }
 
-  public static async addEmployee(empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee | null> {
-    // 1. Create in MockDataStore for instant UI responsiveness
-    const newEmp = MockDataStore.addEmployee(empData);
-
-    // 2. Sync with Firestore if configured
-    if (isFirebaseConfigured && db) {
-      try {
-        await setDoc(doc(db, this.collectionName, newEmp.id), newEmp);
-      } catch (error: any) {
-        console.warn('Firestore addEmployee sync notice:', error?.message || error);
-      }
+  /**
+   * Add a new employee profile directly to Firestore
+   */
+  public static async addEmployee(empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<Employee> {
+    if (!isFirebaseConfigured || !db) {
+      throw new Error('Firebase Firestore is not initialized.');
     }
+
+    // 1. Get existing employee count from Firestore to generate sequential ID
+    const existingSnapshot = await getDocs(collection(db, this.collectionName));
+    const count = existingSnapshot.size;
+    const nextId = `CGG-EMP-${String(count + 1).padStart(4, '0')}`;
+
+    const newEmp: Employee = {
+      ...empData,
+      id: nextId,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    // 2. Write directly to Firestore server
+    await setDoc(doc(db, this.collectionName, nextId), newEmp);
 
     return newEmp;
   }
 
+  /**
+   * Update an existing employee in Firestore
+   */
   public static async updateEmployee(id: string, updates: Partial<Employee>): Promise<boolean> {
-    // 1. Update in MockDataStore
-    MockDataStore.updateEmployee(id, updates);
-
-    // 2. Sync with Firestore if configured
-    if (isFirebaseConfigured && db) {
-      try {
-        const docRef = doc(db, this.collectionName, id);
-        await updateDoc(docRef, {
-          ...updates,
-          updatedAt: new Date().toISOString(),
-        });
-      } catch (error: any) {
-        console.warn('Firestore updateEmployee sync notice:', error?.message || error);
-      }
+    if (!isFirebaseConfigured || !db || !id) {
+      return false;
     }
+
+    const docRef = doc(db, this.collectionName, id);
+    await updateDoc(docRef, {
+      ...updates,
+      updatedAt: new Date().toISOString(),
+    });
 
     return true;
   }
 
+  /**
+   * Deactivate/Soft-delete an employee in Firestore
+   */
   public static async deleteEmployee(id: string): Promise<boolean> {
-    // 1. Delete in MockDataStore
-    MockDataStore.deleteEmployee(id);
-
-    // 2. Sync with Firestore if configured
-    if (isFirebaseConfigured && db) {
-      try {
-        const docRef = doc(db, this.collectionName, id);
-        await updateDoc(docRef, {
-          status: 'inactive',
-          updatedAt: new Date().toISOString(),
-        });
-      } catch (error: any) {
-        console.warn('Firestore deleteEmployee sync notice:', error?.message || error);
-      }
+    if (!isFirebaseConfigured || !db || !id) {
+      return false;
     }
+
+    const docRef = doc(db, this.collectionName, id);
+    await updateDoc(docRef, {
+      status: 'inactive',
+      updatedAt: new Date().toISOString(),
+    });
 
     return true;
   }
