@@ -296,29 +296,20 @@ export function EmployeeForm({
         success("Profile & Credentials Updated", `Updated details and auth credentials on server for ${formData.firstName} ${formData.lastName}`);
         router.push(`/employees/${initialData.id}`);
       } else {
-        // 1. Save Employee into Database / Store
-        const newEmp = await EmployeeService.addEmployee(payload);
+        // 1. Save Employee and Provision Login Account directly via Server API
+        const newEmp = await EmployeeService.addEmployee(payload, {
+          portalPassword: formData.portalPassword,
+          portalRole: formData.portalRole,
+          createdBy: "Super Admin",
+        });
         
         if (!newEmp) {
           throw new Error("Failed to create employee in database.");
         }
 
-        // 2. Provision Auth Credentials on Auth Server & User Registry
-        await AuthService.provisionUser({
-          email: formData.email,
-          password: formData.portalPassword,
-          role: formData.portalRole,
-          employeeId: newEmp.id,
-          displayName: `${formData.firstName} ${formData.lastName}`,
-          photoURL: formData.avatarUrl || undefined,
-          phone: formData.phone || undefined,
-          gender: formData.gender,
-          createdBy: "Super Admin",
-        });
-
         success(
           "Employee & Auth Login Created!",
-          `Added ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}). Login credentials created on Auth Server for ${formData.email}!`
+          `Added ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}). Login credentials created on server for ${formData.email}!`
         );
         router.push(`/employees/${newEmp.id}`);
       }
