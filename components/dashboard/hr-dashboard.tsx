@@ -58,28 +58,28 @@ export function HRDashboard({
   };
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-300">
       {/* Banner */}
-      <div className="p-6 rounded-3xl bg-gradient-to-r from-sky-800 via-sky-700 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="p-4 sm:p-6 rounded-3xl bg-gradient-to-r from-sky-800 via-sky-700 to-slate-900 text-white shadow-xl flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="space-y-1">
           <Badge variant="success" size="sm" className="bg-white/20 text-white border-none">
             HR Operations Control Center
           </Badge>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
-            Human Resources & Workforce Management
+          <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">
+            Human Resources & Workforce
           </h1>
           <p className="text-xs text-white/80">
-            Manage employee directories, leave requests, attendance logs, and recruitment.
+            Employee directories, leave requests, attendance logs, and staff assignments.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 w-full sm:w-auto">
           <Button
             variant="secondary"
             size="sm"
             onClick={() => router.push("/employees/new")}
             leftIcon={<UserPlus className="w-4 h-4" />}
-            className="bg-white text-emerald-700 hover:bg-white/90 border-none shadow-sm"
+            className="w-full sm:w-auto bg-white text-emerald-700 hover:bg-white/90 border-none shadow-sm text-xs"
           >
             Add New Employee
           </Button>
@@ -88,75 +88,75 @@ export function HRDashboard({
             size="sm"
             onClick={() => router.push("/attendance")}
             leftIcon={<Clock className="w-4 h-4" />}
-            className="text-white border-white/40 hover:bg-white/10"
+            className="w-full sm:w-auto text-white border-white/40 hover:bg-white/10 text-xs"
           >
             Attendance Logs
           </Button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* KPI Cards - 2x2 on mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Total Headcount</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">{totalEmployees}</h3>
-              <p className="text-[11px] text-slate-400">{activeEmployees} Confirmed, {probationEmployees} Probation</p>
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">Headcount</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">{totalEmployees}</h3>
+              <p className="text-[10px] text-slate-400 truncate">{activeEmployees} Confirmed</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center">
-              <Users className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Present Today</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">{presentToday} / {activeEmployees}</h3>
-              <p className="text-[11px] text-emerald-600 font-semibold">{Math.round((presentToday / (activeEmployees || 1)) * 100)}% attendance rate</p>
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">Present</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">{presentToday}/{activeEmployees}</h3>
+              <p className="text-[10px] text-emerald-600 font-semibold">{Math.round((presentToday / (activeEmployees || 1)) * 100)}% active</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
-              <Clock className="w-6 h-6" />
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Leaves</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">{pendingLeaves.length}</h3>
-              <p className="text-[11px] text-amber-600 font-semibold">Requires HR Approval</p>
-            </div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
-              <CalendarCheck className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div>
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Departments</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-1">{departments.length}</h3>
-              <p className="text-[11px] text-slate-400">All departments staffed</p>
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">Pending Leaves</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">{pendingLeaves.length}</h3>
+              <p className="text-[10px] text-amber-600 font-semibold">Review needed</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center">
-              <Building2 className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+              <CalendarCheck className="w-5 h-5 sm:w-6 sm:h-6" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card hoverEffect>
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 uppercase tracking-wider">Depts</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">{departments.length}</h3>
+              <p className="text-[10px] text-slate-400">All staffed</p>
+            </div>
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-purple-50 dark:bg-purple-950/60 text-purple-600 flex items-center justify-center shrink-0">
+              <Building2 className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Main Split: Pending Leave Approvals & Department Headcounts */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Pending Leave Queue */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>Leave Approvals Queue</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Leave Approvals Queue</CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Action pending applications
               </p>
@@ -167,18 +167,18 @@ export function HRDashboard({
           </CardHeader>
           <CardContent>
             {pendingLeaves.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">
+              <div className="py-10 text-center text-xs text-slate-400">
                 🎉 No pending leave requests. Everything is up to date!
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-2.5">
                 {pendingLeaves.map((req) => (
                   <div
                     key={req.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800"
                   >
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
                           {req.employeeName}
                         </span>
@@ -189,20 +189,21 @@ export function HRDashboard({
                           ({req.daysCount} {req.daysCount === 1 ? "day" : "days"})
                         </span>
                       </div>
-                      <p className="text-xs text-slate-600 dark:text-slate-300">
+                      <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">
                         {req.reason}
                       </p>
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-[10px] text-slate-400">
                         {formatDate(req.startDate)} to {formatDate(req.endDate)}
                       </p>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-200/60 dark:border-slate-700/60">
                       <Button
                         variant="success"
                         size="sm"
                         onClick={() => handleApproveLeave(req.id)}
                         leftIcon={<CheckCircle2 className="w-3.5 h-3.5" />}
+                        className="flex-1 sm:flex-none text-xs"
                       >
                         Approve
                       </Button>
@@ -211,6 +212,7 @@ export function HRDashboard({
                         size="sm"
                         onClick={() => handleRejectLeave(req.id)}
                         leftIcon={<XCircle className="w-3.5 h-3.5" />}
+                        className="flex-1 sm:flex-none text-xs"
                       >
                         Reject
                       </Button>
@@ -225,24 +227,24 @@ export function HRDashboard({
         {/* Department Overview */}
         <Card>
           <CardHeader>
-            <CardTitle>Department Headcount</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Department Headcount</CardTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400">Team distribution</p>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="space-y-2.5">
             {departments.map((dept) => (
               <div
                 key={dept.id}
-                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800"
+                className="flex items-center justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/40 border border-slate-100 dark:border-slate-800 gap-2"
               >
-                <div>
-                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                <div className="min-w-0">
+                  <p className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                     {dept.name}
                   </p>
-                  <p className="text-[11px] text-slate-400">
+                  <p className="text-[10px] text-slate-400 truncate">
                     Head: {dept.headEmployeeName || "Unassigned"}
                   </p>
                 </div>
-                <Badge variant="secondary" size="sm">
+                <Badge variant="secondary" size="sm" className="shrink-0">
                   {dept.employeeCount} Members
                 </Badge>
               </div>

@@ -2,10 +2,10 @@
 
 import React from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { canAccessModule } from "@/lib/permissions/rbac";
-import { cn } from "@/lib/utils";
+import { cn, getInitials } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import {
   LayoutDashboard,
@@ -24,6 +24,9 @@ import {
   Sparkles,
   ChevronRight,
   Receipt,
+  X,
+  LogOut,
+  User as UserIcon,
 } from "lucide-react";
 import { UserRole } from "@/types";
 
@@ -54,7 +57,8 @@ const NAV_ITEMS: NavItem[] = [
 
 export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const pathname = usePathname();
-  const { user, currentRole, switchRole, isSuperAdmin, isDemoMode } = useAuth();
+  const router = useRouter();
+  const { user, currentRole, switchRole, isSuperAdmin, logout } = useAuth();
 
   const allowedNavItems = NAV_ITEMS.filter((item) =>
     canAccessModule(currentRole, item.module)
@@ -73,29 +77,42 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   };
 
   return (
-    <aside className="w-64 h-screen bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 select-none">
+    <aside className="w-full sm:w-72 lg:w-64 h-full bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 select-none overflow-hidden">
       {/* Brand Header */}
-      <div className="p-5 flex items-center gap-3 border-b border-slate-800/80">
-        <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md overflow-hidden shrink-0">
-          <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
-        </div>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="font-bold text-base text-white tracking-tight truncate">
-              Coralgenz
-            </span>
-            <span className="text-coral-500 font-black text-xs uppercase tracking-wider">
-              Pay
-            </span>
+      <div className="p-4 sm:p-5 flex items-center justify-between border-b border-slate-800/80">
+        <div className="flex items-center gap-3 min-w-0">
+          <div className="w-10 h-10 rounded-xl bg-white p-1 flex items-center justify-center shadow-md overflow-hidden shrink-0">
+            <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
           </div>
-          <p className="text-[10px] text-slate-400 font-medium truncate">
-            Workforce & Payroll
-          </p>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-1.5">
+              <span className="font-bold text-base text-white tracking-tight truncate">
+                Coralgenz
+              </span>
+              <span className="text-coral-500 font-black text-xs uppercase tracking-wider">
+                Pay
+              </span>
+            </div>
+            <p className="text-[10px] text-slate-400 font-medium truncate">
+              Workforce & Payroll
+            </p>
+          </div>
         </div>
+
+        {onCloseMobile && (
+          <button
+            type="button"
+            onClick={onCloseMobile}
+            className="lg:hidden p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+            title="Close menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        )}
       </div>
 
       {/* Role Indicator Banner */}
-      <div className="px-5 py-3 border-b border-slate-800/60 bg-slate-950/40">
+      <div className="px-4 sm:px-5 py-2.5 border-b border-slate-800/60 bg-slate-950/40">
         <div className="flex items-center justify-between">
           <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
             Active Role
@@ -107,7 +124,7 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
       </div>
 
       {/* Navigation List */}
-      <div className="flex-1 overflow-y-auto px-3 py-4 space-y-1 scrollbar-thin">
+      <div className="flex-1 overflow-y-auto px-3 py-3 space-y-1 scrollbar-thin touch-scroll">
         {allowedNavItems.map((item) => {
           const isActive =
             pathname === item.href ||
@@ -120,7 +137,7 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
               href={item.href}
               onClick={onCloseMobile}
               className={cn(
-                "flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group",
+                "flex items-center justify-between px-3.5 py-2.5 sm:py-2.5 rounded-xl text-xs font-semibold transition-all duration-150 group min-h-[44px]",
                 isActive
                   ? "bg-coral-500 text-white shadow-sm shadow-coral-500/20"
                   : "text-slate-400 hover:text-white hover:bg-slate-800/60"
@@ -147,35 +164,63 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
         })}
       </div>
 
-      {/* Super Admin Switcher Quick Bar - ONLY available to Super Admin */}
-      {isSuperAdmin ? (
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950/70 space-y-2">
-          <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 px-1">
-            <Sparkles className="w-3.5 h-3.5 text-sky-400" />
-            <span>Super Admin Perspective Switcher</span>
+      {/* Mobile Drawer Profile & Logout Footer */}
+      <div className="p-3 border-t border-slate-800/80 bg-slate-950/60 space-y-2">
+        {/* Super Admin Switcher Quick Bar */}
+        {isSuperAdmin ? (
+          <div className="space-y-1.5 pb-2 border-b border-slate-800/60">
+            <div className="flex items-center gap-1.5 text-[10px] font-semibold text-slate-400 px-1">
+              <Sparkles className="w-3.5 h-3.5 text-sky-400" />
+              <span>Perspective Switcher</span>
+            </div>
+            <select
+              value={currentRole}
+              onChange={handleRoleChange}
+              className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer min-h-[38px]"
+            >
+              <option value="super_admin">👑 Super Admin</option>
+              <option value="hr_admin">💼 HR Admin</option>
+              <option value="payroll_manager">📊 Payroll Mgr</option>
+              <option value="manager">👔 Team Manager</option>
+              <option value="employee">👩‍💻 Employee</option>
+            </select>
           </div>
-          <select
-            value={currentRole}
-            onChange={handleRoleChange}
-            className="w-full bg-slate-900 border border-slate-700 text-slate-200 text-xs rounded-xl px-2.5 py-2 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
+        ) : null}
+
+        {/* User Card on Mobile */}
+        <div className="flex items-center justify-between gap-2 pt-1 px-1">
+          <Link
+            href="/profile"
+            onClick={onCloseMobile}
+            className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80 transition-opacity"
           >
-            <option value="super_admin">👑 Super Admin (Karthick)</option>
-            <option value="hr_admin">💼 HR Admin (Karthick)</option>
-            <option value="payroll_manager">📊 Payroll Mgr (Thanvanth H)</option>
-            <option value="manager">👔 Manager (Sarvesh)</option>
-            <option value="employee">👩‍💻 Employee</option>
-          </select>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-coral-500 to-amber-500 text-white font-bold text-xs flex items-center justify-center shrink-0">
+              {getInitials(user?.displayName)}
+            </div>
+            <div className="min-w-0 flex-1 text-left">
+              <p className="text-xs font-semibold text-white truncate">
+                {user?.displayName || "User"}
+              </p>
+              <p className="text-[10px] text-slate-400 truncate">
+                {user?.email}
+              </p>
+            </div>
+          </Link>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (onCloseMobile) onCloseMobile();
+              logout();
+              router.push("/login");
+            }}
+            className="p-2 text-rose-400 hover:text-rose-300 hover:bg-rose-950/40 rounded-xl transition-colors shrink-0"
+            title="Sign out"
+          >
+            <LogOut className="w-4 h-4" />
+          </button>
         </div>
-      ) : (
-        <div className="p-3 border-t border-slate-800/80 bg-slate-950/40 text-center">
-          <p className="text-[10px] text-slate-400">
-            Assigned Portal: <span className="font-semibold text-sky-400 capitalize">{currentRole.replace("_", " ")}</span>
-          </p>
-          <p className="text-[9px] text-slate-400 mt-0.5">
-            Role managed by Super Admin
-          </p>
-        </div>
-      )}
+      </div>
     </aside>
   );
 }

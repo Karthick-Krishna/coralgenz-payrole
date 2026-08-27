@@ -9,8 +9,8 @@ export function Table({
   ...props
 }: React.HTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="w-full overflow-x-auto rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
-      <table className={cn("w-full text-left text-sm text-slate-600 dark:text-slate-300", className)} {...props}>
+    <div className="w-full overflow-x-auto touch-scroll rounded-2xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+      <table className={cn("w-full text-left text-sm text-slate-600 dark:text-slate-300 min-w-[600px] sm:min-w-full", className)} {...props}>
         {children}
       </table>
     </div>
@@ -25,7 +25,7 @@ export function TableHeader({
   return (
     <thead
       className={cn(
-        "bg-slate-50/80 dark:bg-slate-800/60 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-850",
+        "bg-slate-50/80 dark:bg-slate-800/60 text-xs uppercase tracking-wider text-slate-500 dark:text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800",
         className
       )}
       {...props}
@@ -72,7 +72,7 @@ export function TableHead({
 }: React.ThHTMLAttributes<HTMLTableCellElement>) {
   return (
     <th
-      className={cn("px-4 py-3.5 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap", className)}
+      className={cn("px-3.5 sm:px-4 py-3 font-semibold text-slate-700 dark:text-slate-300 whitespace-nowrap text-xs sm:text-sm", className)}
       {...props}
     >
       {children}
@@ -86,7 +86,7 @@ export function TableCell({
   ...props
 }: React.TdHTMLAttributes<HTMLTableCellElement>) {
   return (
-    <td className={cn("px-4 py-3.5 whitespace-nowrap text-sm text-slate-700 dark:text-slate-300 align-middle", className)} {...props}>
+    <td className={cn("px-3.5 sm:px-4 py-3 whitespace-nowrap text-xs sm:text-sm text-slate-700 dark:text-slate-300 align-middle", className)} {...props}>
       {children}
     </td>
   );
@@ -104,7 +104,7 @@ export function TableEmptyState({
   action?: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+    <div className="flex flex-col items-center justify-center py-10 sm:py-12 px-4 text-center">
       {icon && <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-2xl text-slate-400 mb-3">{icon}</div>}
       <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100">{title}</h4>
       {description && <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 max-w-sm">{description}</p>}

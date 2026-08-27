@@ -344,35 +344,37 @@ export function EmployeeForm({
   ];
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 max-w-4xl mx-auto">
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 max-w-4xl mx-auto pb-10 sm:pb-0">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+        <div className="flex items-center gap-2.5 sm:gap-3">
           <Button
             type="button"
             variant="ghost"
             size="sm"
             onClick={() => router.back()}
             leftIcon={<ArrowLeft className="w-4 h-4" />}
+            className="shrink-0"
           >
             Back
           </Button>
-          <div>
-            <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+          <div className="min-w-0">
+            <h1 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-slate-100 truncate">
               {isEditing ? `Edit Employee: ${initialData?.firstName} ${initialData?.lastName}` : "Onboard New Employee"}
             </h1>
-            <p className="text-xs text-slate-500">
-              {isEditing ? `Employee ID: ${initialData?.id}` : "Step-by-step employee profile creation & login provisioning"}
+            <p className="text-xs text-slate-500 truncate">
+              {isEditing ? `Employee ID: ${initialData?.id}` : "Step-by-step profile creation & login provisioning"}
             </p>
           </div>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={() => router.push("/employees")}
+            className="flex-1 sm:flex-none text-xs"
           >
             Cancel
           </Button>
@@ -382,15 +384,16 @@ export function EmployeeForm({
             size="sm"
             isLoading={isSubmitting}
             leftIcon={<Save className="w-4 h-4" />}
+            className="flex-1 sm:flex-none text-xs"
           >
-            {isEditing ? "Save Changes" : "Save & Provision Login"}
+            {isEditing ? "Save Changes" : "Save & Provision"}
           </Button>
         </div>
       </div>
 
       {/* Main Card */}
       <Card>
-        <CardHeader className="pb-0 border-b border-slate-200 dark:border-slate-800">
+        <CardHeader className="pb-0 p-3 sm:p-6 border-b border-slate-200 dark:border-slate-800">
           <Tabs
             tabs={tabs}
             activeTab={activeTab}
@@ -399,7 +402,7 @@ export function EmployeeForm({
           />
         </CardHeader>
 
-        <CardContent className="pt-6">
+        <CardContent className="p-4 sm:p-6">
           {/* TAB 1: PERSONAL INFORMATION */}
           {activeTab === "personal" && (
             <div className="space-y-4 animate-in fade-in duration-150">

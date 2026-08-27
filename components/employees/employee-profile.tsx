@@ -301,11 +301,11 @@ export function EmployeeProfile({
       {/* Profile Header Hero Card */}
       <Card className="overflow-hidden border-slate-200/80 dark:border-slate-800">
         <div className="h-32 bg-gradient-to-r from-slate-900 via-sky-900 to-blue-900 relative" />
-        <div className="px-6 pb-6 pt-0 relative">
-          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-12">
-            <div className="flex items-end gap-4">
-              <div className="relative group">
-                <div className="w-24 h-24 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-2xl flex items-center justify-center border-4 border-white dark:border-slate-900 shadow-xl shrink-0 overflow-hidden">
+        <div className="px-4 sm:px-6 pb-4 sm:pb-6 pt-0 relative">
+          <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 -mt-10 sm:-mt-12">
+            <div className="flex flex-col sm:flex-row items-center sm:items-end text-center sm:text-left gap-3 sm:gap-4">
+              <div className="relative group shrink-0">
+                <div className="w-20 h-20 sm:w-24 sm:h-24 rounded-2xl bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-xl sm:text-2xl flex items-center justify-center border-4 border-white dark:border-slate-900 shadow-xl overflow-hidden">
                   {employee.avatarUrl ? (
                     <img src={employee.avatarUrl} alt={employee.firstName} className="w-full h-full object-cover" />
                   ) : (
@@ -322,14 +322,14 @@ export function EmployeeProfile({
                     title="Change Profile Photo (Super Admin / HR)"
                     className="absolute -bottom-1 -right-1 p-2 rounded-xl bg-sky-600 text-white hover:bg-sky-500 shadow-lg border-2 border-white dark:border-slate-900 transition-all hover:scale-110 flex items-center justify-center"
                   >
-                    <Camera className="w-4 h-4" />
+                    <Camera className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   </button>
                 )}
               </div>
 
               <div className="space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 sm:gap-2">
+                  <h1 className="text-xl sm:text-2xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
                     {employee.firstName} {employee.lastName}
                   </h1>
                   <Badge variant="coral" size="sm">
@@ -344,13 +344,13 @@ export function EmployeeProfile({
                   </Badge>
                 </div>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {employee.designationTitle} • {employee.departmentName} • Joined {formatDate(employee.joiningDate)}
+                  {employee.designationTitle} • {employee.departmentName}
                 </p>
               </div>
             </div>
 
-            {/* Actions Toolbar */}
-            <div className="flex flex-wrap items-center gap-2">
+            {/* Actions Toolbar - Responsive grid on mobile */}
+            <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 w-full sm:w-auto">
               {canManagePhotos && (
                 <Button
                   variant="outline"
@@ -359,7 +359,8 @@ export function EmployeeProfile({
                     setSelectedPhotoUrl(employee.avatarUrl || "");
                     setShowPhotoModal(true);
                   }}
-                  leftIcon={<Camera className="w-4 h-4 text-sky-500" />}
+                  leftIcon={<Camera className="w-3.5 h-3.5 text-sky-500" />}
+                  className="text-xs"
                 >
                   Set Photo
                 </Button>
@@ -368,7 +369,8 @@ export function EmployeeProfile({
                 variant="outline"
                 size="sm"
                 onClick={() => setShowRevisionModal(true)}
-                leftIcon={<DollarSign className="w-4 h-4 text-emerald-500" />}
+                leftIcon={<DollarSign className="w-3.5 h-3.5 text-emerald-500" />}
+                className="text-xs"
               >
                 Revise Salary
               </Button>
@@ -376,31 +378,35 @@ export function EmployeeProfile({
                 variant="outline"
                 size="sm"
                 onClick={() => setShowDocModal(true)}
-                leftIcon={<Upload className="w-4 h-4 text-blue-500" />}
+                leftIcon={<Upload className="w-3.5 h-3.5 text-blue-500" />}
+                className="text-xs"
               >
-                Upload Document
+                Document
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowPasswordModal(true)}
-                leftIcon={<KeyRound className="w-4 h-4 text-sky-500" />}
+                leftIcon={<KeyRound className="w-3.5 h-3.5 text-sky-500" />}
+                className="text-xs"
               >
-                Change Password
+                Password
               </Button>
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => setShowExitModal(true)}
-                leftIcon={<UserMinus className="w-4 h-4 text-rose-500" />}
+                leftIcon={<UserMinus className="w-3.5 h-3.5 text-rose-500" />}
+                className="text-xs"
               >
-                Offboard / Exit
+                Offboard
               </Button>
               <Button
                 variant="coral"
                 size="sm"
                 onClick={() => router.push(`/employees/new?editId=${employee.id}`)}
-                leftIcon={<Edit className="w-4 h-4" />}
+                leftIcon={<Edit className="w-3.5 h-3.5" />}
+                className="text-xs col-span-2 sm:col-span-1"
               >
                 Edit Profile
               </Button>

@@ -30,6 +30,7 @@ import {
   Check,
   X,
   FileText,
+  Calendar,
 } from "lucide-react";
 
 interface LeaveManagerProps {
@@ -84,6 +85,13 @@ export function LeaveManager({
     }
   }, [startDate, endDate]);
 
+  const myEmpId =
+    user?.employeeId ||
+    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
+    "CGG-EMP-0002";
+  const isEmployee = currentRole === "employee";
+  const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "manager";
+
   const handleApplyLeave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveReason.trim()) {
@@ -91,7 +99,7 @@ export function LeaveManager({
       return;
     }
 
-    const targetEmpId = currentRole === "employee" ? myEmpId : selectedEmployeeId;
+    const targetEmpId = isEmployee ? myEmpId : selectedEmployeeId;
     const emp =
       employees.find((e) => e.id === targetEmpId) ||
       employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase()) ||
@@ -140,12 +148,6 @@ export function LeaveManager({
     refreshData();
   };
 
-  const myEmpId =
-    user?.employeeId ||
-    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
-    "CGG-EMP-0002";
-  const isEmployee = currentRole === "employee";
-
   const filteredRequests = requests.filter((r) => {
     if (isEmployee) {
       if (r.employeeId !== myEmpId && r.employeeName !== user?.displayName) return false;
@@ -167,15 +169,15 @@ export function LeaveManager({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Leave Management
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Apply for leave, track annual quotas, and manage team approvals.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Apply for leave, track annual quotas, and manage team approvals
           </p>
         </div>
 
@@ -184,68 +186,71 @@ export function LeaveManager({
           size="sm"
           onClick={() => setShowApplyModal(true)}
           leftIcon={<Plus className="w-4 h-4" />}
+          className="w-full sm:w-auto text-xs"
         >
           Apply for Leave
         </Button>
       </div>
 
-      {/* Leave Balance Quotas Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+      {/* Leave Balance Quotas Grid - 2x2 on mobile */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
         <Card hoverEffect>
-          <CardContent className="p-4 text-center space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Casual Leave</span>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+          <CardContent className="p-3 sm:p-4 text-center space-y-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Casual</span>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
               {currentBalance?.casual?.remaining ?? 9}
             </div>
-            <span className="text-[10px] text-slate-500">
-              Used: {currentBalance?.casual?.used ?? 3} / {currentBalance?.casual?.allocated ?? 12}
+            <span className="text-[10px] text-slate-500 block truncate">
+              Used: {currentBalance?.casual?.used ?? 3}/{currentBalance?.casual?.allocated ?? 12}
             </span>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-4 text-center space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Sick Leave</span>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+          <CardContent className="p-3 sm:p-4 text-center space-y-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Sick</span>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
               {currentBalance?.sick?.remaining ?? 9}
             </div>
-            <span className="text-[10px] text-slate-500">
-              Used: {currentBalance?.sick?.used ?? 1} / {currentBalance?.sick?.allocated ?? 10}
+            <span className="text-[10px] text-slate-500 block truncate">
+              Used: {currentBalance?.sick?.used ?? 1}/{currentBalance?.sick?.allocated ?? 10}
             </span>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-4 text-center space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Annual Leave</span>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+          <CardContent className="p-3 sm:p-4 text-center space-y-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Annual</span>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
               {currentBalance?.annual?.remaining ?? 11}
             </div>
-            <span className="text-[10px] text-slate-500">
-              Used: {currentBalance?.annual?.used ?? 4} / {currentBalance?.annual?.allocated ?? 15}
+            <span className="text-[10px] text-slate-500 block truncate">
+              Used: {currentBalance?.annual?.used ?? 4}/{currentBalance?.annual?.allocated ?? 15}
             </span>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-4 text-center space-y-1">
-            <span className="text-[11px] font-bold text-slate-400 uppercase">Earned Leave</span>
-            <div className="text-2xl font-black text-slate-900 dark:text-slate-100">
+          <CardContent className="p-3 sm:p-4 text-center space-y-1">
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Earned</span>
+            <div className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
               {currentBalance?.earned?.remaining ?? 8}
             </div>
-            <span className="text-[10px] text-slate-500">
-              Used: {currentBalance?.earned?.used ?? 2} / {currentBalance?.earned?.allocated ?? 10}
+            <span className="text-[10px] text-slate-500 block truncate">
+              Used: {currentBalance?.earned?.used ?? 2}/{currentBalance?.earned?.allocated ?? 10}
             </span>
           </CardContent>
         </Card>
       </div>
 
-      {/* Filter and Requests Table */}
+      {/* Filter Toolbar */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Leave Applications</CardTitle>
+        <CardContent className="p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <span className="font-bold text-sm text-slate-900 dark:text-slate-100 self-start sm:self-center">
+            Leave Applications
+          </span>
           <Select
-            className="w-44"
+            className="w-full sm:w-48 text-xs"
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
           >
@@ -254,124 +259,204 @@ export function LeaveManager({
             <option value="approved">Approved</option>
             <option value="rejected">Rejected</option>
           </Select>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Employee</TableHead>
-                <TableHead>Leave Type</TableHead>
-                <TableHead>Duration</TableHead>
-                <TableHead>Days</TableHead>
-                <TableHead>Reason</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredRequests.length === 0 ? (
-                <tr>
-                  <td colSpan={7}>
-                    <TableEmptyState
-                      icon={<CalendarCheck className="w-8 h-8" />}
-                      title="No leave requests found"
-                      description="No records matched the selected status filter."
-                    />
-                  </td>
-                </tr>
-              ) : (
-                filteredRequests.map((req) => (
-                  <TableRow key={req.id}>
-                    <TableCell>
-                      <span className="font-bold text-slate-900 dark:text-slate-100 block">
-                        {req.employeeName}
-                      </span>
-                      <span className="text-[11px] text-slate-400">{req.departmentName}</span>
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge variant="coral" size="sm" className="capitalize">
-                        {req.leaveType}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell>
-                      <span className="text-xs text-slate-700 dark:text-slate-300">
-                        {formatDate(req.startDate)} &rarr; {formatDate(req.endDate)}
-                      </span>
-                    </TableCell>
-
-                    <TableCell>
-                      <span className="font-bold text-xs">{req.daysCount} d</span>
-                    </TableCell>
-
-                    <TableCell>
-                      <span className="text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate block">
-                        {req.reason}
-                      </span>
-                    </TableCell>
-
-                    <TableCell>
-                      <Badge
-                        variant={statusVariants[req.status]?.variant || "secondary"}
-                        size="sm"
-                        dot
-                      >
-                        {statusVariants[req.status]?.label || req.status}
-                      </Badge>
-                    </TableCell>
-
-                    <TableCell className="text-right">
-                      {req.status === "pending" && currentRole !== "employee" ? (
-                        <div className="flex items-center justify-end gap-1.5">
-                          <Button
-                            variant="success"
-                            size="sm"
-                            onClick={() => handleApprove(req.id)}
-                            className="h-7 px-2 text-xs"
-                          >
-                            <Check className="w-3.5 h-3.5 mr-1" /> Approve
-                          </Button>
-                          <Button
-                            variant="danger"
-                            size="sm"
-                            onClick={() => handleReject(req.id)}
-                            className="h-7 px-2 text-xs"
-                          >
-                            <X className="w-3.5 h-3.5 mr-1" /> Reject
-                          </Button>
-                        </div>
-                      ) : (
-                        <span className="text-[11px] text-slate-400">
-                          {req.reviewerName ? `By ${req.reviewerName}` : "—"}
-                        </span>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
         </CardContent>
       </Card>
 
-      {/* MODAL: APPLY LEAVE */}
+      {/* Mobile Card List (< md) */}
+      <div className="block md:hidden space-y-3">
+        {filteredRequests.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-xs text-slate-400">
+              No leave requests found for the selected filter.
+            </CardContent>
+          </Card>
+        ) : (
+          filteredRequests.map((req) => (
+            <div
+              key={req.id}
+              className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100 block">
+                    {req.employeeName}
+                  </span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    <Badge variant="coral" size="sm" className="capitalize">
+                      {req.leaveType}
+                    </Badge>
+                    <span className="text-[11px] text-slate-400 font-bold">{req.daysCount} Days</span>
+                  </div>
+                </div>
+
+                <Badge
+                  variant={statusVariants[req.status]?.variant || "secondary"}
+                  size="sm"
+                  dot
+                >
+                  {statusVariants[req.status]?.label || req.status}
+                </Badge>
+              </div>
+
+              <div className="p-2.5 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs space-y-1">
+                <div className="flex justify-between text-[11px] text-slate-500">
+                  <span>Duration:</span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300">
+                    {formatDate(req.startDate)} &rarr; {formatDate(req.endDate)}
+                  </span>
+                </div>
+                {req.reason && (
+                  <p className="text-slate-600 dark:text-slate-300 text-xs italic pt-1 border-t border-slate-200/50 dark:border-slate-700/50">
+                    &ldquo;{req.reason}&rdquo;
+                  </p>
+                )}
+              </div>
+
+              {canApprove && req.status === "pending" && (
+                <div className="flex items-center justify-end gap-2 pt-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleReject(req.id)}
+                    className="h-8 text-xs text-rose-600 hover:bg-rose-50 flex-1"
+                  >
+                    <X className="w-3.5 h-3.5 mr-1" />
+                    Reject
+                  </Button>
+                  <Button
+                    variant="success"
+                    size="sm"
+                    onClick={() => handleApprove(req.id)}
+                    className="h-8 text-xs flex-1"
+                  >
+                    <Check className="w-3.5 h-3.5 mr-1" />
+                    Approve
+                  </Button>
+                </div>
+              )}
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Leave Table (>= md) */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Employee</TableHead>
+              <TableHead>Leave Type</TableHead>
+              <TableHead>Duration</TableHead>
+              <TableHead>Days</TableHead>
+              <TableHead>Reason</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredRequests.length === 0 ? (
+              <tr>
+                <td colSpan={7}>
+                  <TableEmptyState
+                    icon={<CalendarCheck className="w-8 h-8" />}
+                    title="No leave requests found"
+                    description="No records matched the selected status filter."
+                  />
+                </td>
+              </tr>
+            ) : (
+              filteredRequests.map((req) => (
+                <TableRow key={req.id}>
+                  <TableCell>
+                    <span className="font-bold text-slate-900 dark:text-slate-100 block">
+                      {req.employeeName}
+                    </span>
+                    <span className="text-[11px] text-slate-400">{req.departmentName}</span>
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge variant="coral" size="sm" className="capitalize">
+                      {req.leaveType}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-xs text-slate-700 dark:text-slate-300">
+                      {formatDate(req.startDate)} &rarr; {formatDate(req.endDate)}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="font-bold text-xs">{req.daysCount} d</span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-xs text-slate-600 dark:text-slate-300 max-w-xs truncate block">
+                      {req.reason}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge
+                      variant={statusVariants[req.status]?.variant || "secondary"}
+                      size="sm"
+                      dot
+                    >
+                      {statusVariants[req.status]?.label || req.status}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    {canApprove && req.status === "pending" ? (
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleApprove(req.id)}
+                          className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                          title="Approve Request"
+                        >
+                          <Check className="w-4 h-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleReject(req.id)}
+                          className="h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          title="Reject Request"
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <span className="text-xs text-slate-400">—</span>
+                    )}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
+
+      {/* Apply Leave Modal */}
       <Modal
         isOpen={showApplyModal}
         onClose={() => setShowApplyModal(false)}
         title="Apply for Leave"
-        description="Submit leave application for manager / HR review"
+        description="Submit a leave application for manager approval"
+        maxWidth="md"
       >
         <form onSubmit={handleApplyLeave} className="space-y-4">
-          {currentRole !== "employee" && (
+          {!isEmployee && (
             <Select
               label="Select Employee"
               value={selectedEmployeeId}
               onChange={(e) => setSelectedEmployeeId(e.target.value)}
             >
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.firstName} {emp.lastName} ({emp.id})
+              {employees.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.firstName} {e.lastName} ({e.departmentName})
                 </option>
               ))}
             </Select>
@@ -382,46 +467,52 @@ export function LeaveManager({
             value={leaveType}
             onChange={(e) => setLeaveType(e.target.value as LeaveRequest["leaveType"])}
           >
-            <option value="casual">Casual Leave</option>
-            <option value="sick">Sick Leave</option>
-            <option value="annual">Annual Leave</option>
-            <option value="earned">Earned Leave</option>
-            <option value="maternity">Maternity Leave</option>
-            <option value="paternity">Paternity Leave</option>
-            <option value="unpaid">Unpaid Leave (Loss of Pay)</option>
+            <option value="casual">Casual Leave ({currentBalance?.casual?.remaining ?? 9} remaining)</option>
+            <option value="sick">Sick Leave ({currentBalance?.sick?.remaining ?? 9} remaining)</option>
+            <option value="annual">Annual Leave ({currentBalance?.annual?.remaining ?? 11} remaining)</option>
+            <option value="earned">Earned Leave ({currentBalance?.earned?.remaining ?? 8} remaining)</option>
+            <option value="unpaid">Loss of Pay / Unpaid</option>
           </Select>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <Input
-              label="Start Date"
               type="date"
-              required
+              label="Start Date"
               value={startDate}
               onChange={(e) => setStartDate(e.target.value)}
+              required
             />
             <Input
-              label="End Date"
               type="date"
-              required
+              label="End Date"
               value={endDate}
               onChange={(e) => setEndDate(e.target.value)}
+              required
             />
           </div>
 
-          <div className="p-3 bg-slate-100 dark:bg-slate-800 rounded-xl text-xs flex justify-between font-semibold">
-            <span>Total Leave Duration:</span>
-            <span className="text-coral-600 dark:text-coral-400">{daysCount} Days</span>
+          <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 text-xs flex items-center justify-between">
+            <span className="text-slate-500 font-medium">Total Duration:</span>
+            <span className="font-bold text-coral-600 dark:text-coral-400 font-mono text-sm">
+              {daysCount} {daysCount === 1 ? "Day" : "Days"}
+            </span>
           </div>
 
-          <Input
-            label="Reason for Leave"
-            required
-            value={leaveReason}
-            onChange={(e) => setLeaveReason(e.target.value)}
-            placeholder="e.g. Family function, medical consultation, personal travel"
-          />
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Reason for Leave
+            </label>
+            <textarea
+              className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 text-xs focus:ring-1 focus:ring-coral-500 focus:outline-none"
+              rows={3}
+              value={leaveReason}
+              onChange={(e) => setLeaveReason(e.target.value)}
+              placeholder="e.g. Personal family event, medical appointment, fever..."
+              required
+            />
+          </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
@@ -431,7 +522,7 @@ export function LeaveManager({
               Cancel
             </Button>
             <Button type="submit" variant="coral" size="sm">
-              Submit Leave Application
+              Submit Leave
             </Button>
           </div>
         </form>

@@ -29,8 +29,6 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  BarChart,
-  Bar,
   PieChart,
   Pie,
   Cell,
@@ -82,7 +80,7 @@ export function SuperAdminDashboard({
     { month: "May", gross: 820000, net: 742000 },
     { month: "Jun", gross: 835000, net: 755000 },
     { month: "Jul", gross: 844000, net: 762450 },
-    { month: "Aug (Est)", gross: 855000, net: 772000 },
+    { month: "Aug", gross: 855000, net: 772000 },
   ];
 
   const deptData = departments.map((d) => ({
@@ -94,41 +92,42 @@ export function SuperAdminDashboard({
   const COLORS = ["#0284c7", "#0ea5e9", "#38bdf8", "#06b6d4", "#3b82f6", "#10b981"];
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-300">
+    <div className="space-y-4 sm:space-y-8 animate-in fade-in duration-300">
       {/* Welcome Banner */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-sky-950/80 to-slate-900 text-white shadow-xl relative overflow-hidden border border-sky-800/30">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 sm:p-6 rounded-3xl bg-gradient-to-r from-slate-950 via-sky-950/80 to-slate-900 text-white shadow-xl relative overflow-hidden border border-sky-800/30">
         <div className="space-y-1 relative z-10">
           <div className="flex items-center gap-2">
             <Badge variant="coral" size="sm">
               Super Admin Workspace
             </Badge>
-            <span className="text-xs text-slate-400 font-medium">
-              Bengaluru HQ • Active Financial Year 2026-27
+            <span className="text-[11px] text-slate-400 font-medium truncate">
+              FY 2026-27 • Tamil Nadu HQ
             </span>
           </div>
-          <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight">
+          <h1 className="text-xl sm:text-3xl font-extrabold tracking-tight">
             Coralgenz Workforce & Payroll
           </h1>
           <p className="text-xs text-slate-300 max-w-xl">
-            Complete corporate payroll processing, compliance records (PF/ESI/PT/TDS), employee lifecycles, and automated payslip distribution.
+            Corporate payroll processing, statutory compliance, employee lifecycles, and auto payslips.
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-2.5 relative z-10">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-2.5 relative z-10 w-full sm:w-auto">
           <Button
             variant="coral"
             size="sm"
             onClick={() => router.push("/payroll/process")}
             leftIcon={<PlayCircle className="w-4 h-4" />}
+            className="w-full sm:w-auto text-xs"
           >
-            Process August Payroll
+            Process Payroll
           </Button>
           <Button
             variant="outline"
             size="sm"
             onClick={() => router.push("/employees/new")}
             leftIcon={<PlusCircle className="w-4 h-4" />}
-            className="text-white border-slate-700 hover:bg-slate-800"
+            className="w-full sm:w-auto text-xs text-white border-slate-700 hover:bg-slate-800"
           >
             Add Employee
           </Button>
@@ -138,103 +137,103 @@ export function SuperAdminDashboard({
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-coral-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+      {/* KPI Cards Grid - 2x2 on mobile */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
         {/* Total Employees */}
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Total Employees
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Total Staff
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
                   {totalEmployees}
                 </span>
-                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> 100% active
+                <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hidden sm:inline">
+                  100% active
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">Across 6 departments</p>
+              <p className="text-[10px] text-slate-400">6 departments</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center">
-              <Users className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
 
         {/* Present Today */}
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                 Present Today
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100">
-                  {presentToday} / {activeEmployees}
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
+                  {presentToday}/{activeEmployees}
                 </span>
-                <span className="text-xs font-semibold text-emerald-600">
+                <span className="text-[10px] font-semibold text-emerald-600">
                   {Math.round((presentToday / (activeEmployees || 1)) * 100)}%
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">1 on approved leave, 1 remote</p>
+              <p className="text-[10px] text-slate-400">Active Shift</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center">
-              <Clock className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
 
         {/* Current Monthly Payroll */}
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Monthly Net Payroll
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Monthly Net
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-base sm:text-2xl font-black text-slate-900 dark:text-slate-100 truncate max-w-[100px] sm:max-w-none">
                   {formatINR(latestRun.totalNetPayroll)}
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400">Gross: {formatINR(latestRun.totalGrossPayroll)}</p>
+              <p className="text-[10px] text-slate-400">August Period</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-coral-50 dark:bg-coral-950/60 text-coral-600 flex items-center justify-center">
-              <CreditCard className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-coral-50 dark:bg-coral-950/60 text-coral-600 flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
 
         {/* Pending Actions */}
         <Card hoverEffect>
-          <CardContent className="p-5 flex items-center justify-between">
-            <div className="space-y-1">
-              <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
-                Pending Leave Queue
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-0.5">
+              <p className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                Leave Queue
               </p>
-              <div className="flex items-baseline gap-2">
-                <span className="text-2xl font-black text-slate-900 dark:text-slate-100">
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100">
                   {pendingLeaves}
                 </span>
-                <span className="text-xs font-semibold text-amber-600">Requires Review</span>
+                <span className="text-[10px] font-semibold text-amber-600">Pending</span>
               </div>
-              <p className="text-[11px] text-slate-400">Diya Raj & Sneha Reddy</p>
+              <p className="text-[10px] text-slate-400">Requires Review</p>
             </div>
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center">
-              <CalendarCheck className="w-6 h-6" />
+            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+              <CalendarCheck className="w-5 h-5 sm:w-6 sm:h-6" />
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Analytics Charts Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Payroll Expense Trends */}
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
-              <CardTitle>Monthly Payroll Cost Trend</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Payroll Cost Trend</CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
                 Gross Salary vs. Net Disbursed (INR)
               </p>
@@ -244,7 +243,7 @@ export function SuperAdminDashboard({
             </Badge>
           </CardHeader>
           <CardContent>
-            <div className="h-72 w-full pt-4">
+            <div className="h-60 sm:h-72 w-full pt-2 sm:pt-4">
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={payrollTrendData}>
                   <defs>
@@ -301,21 +300,21 @@ export function SuperAdminDashboard({
         {/* Department Distribution */}
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle>Department Payroll Cost</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Department Cost</CardTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Monthly budget per department
             </p>
           </CardHeader>
           <CardContent>
-            <div className="h-48 w-full flex items-center justify-center">
+            <div className="h-44 sm:h-48 w-full flex items-center justify-center">
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <Pie
                     data={deptData}
                     cx="50%"
                     cy="50%"
-                    innerRadius={50}
-                    outerRadius={75}
+                    innerRadius={45}
+                    outerRadius={68}
                     paddingAngle={3}
                     dataKey="payroll"
                   >
@@ -337,7 +336,7 @@ export function SuperAdminDashboard({
               </ResponsiveContainer>
             </div>
 
-            <div className="space-y-2 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+            <div className="space-y-1.5 mt-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               {deptData.slice(0, 4).map((d, i) => (
                 <div key={d.name} className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
@@ -360,16 +359,16 @@ export function SuperAdminDashboard({
       </div>
 
       {/* Quick Actions & Recent Activities Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         {/* Quick Actions Panel */}
         <Card className="lg:col-span-1">
           <CardHeader>
-            <CardTitle>Core Management Actions</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Management Actions</CardTitle>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Frequently accessed workflows
             </p>
           </CardHeader>
-          <CardContent className="space-y-2.5">
+          <CardContent className="space-y-2">
             <Button
               variant="outline"
               className="w-full justify-between text-xs py-3"
@@ -415,7 +414,7 @@ export function SuperAdminDashboard({
             >
               <div className="flex items-center gap-2.5">
                 <TrendingUp className="w-4 h-4 text-purple-500" />
-                <span>Generate Compliance Reports</span>
+                <span>Compliance Reports</span>
               </div>
               <ArrowUpRight className="w-4 h-4 text-slate-400" />
             </Button>
@@ -426,9 +425,9 @@ export function SuperAdminDashboard({
         <Card className="lg:col-span-2">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle>System Activity & Audit Log</CardTitle>
+              <CardTitle className="text-base sm:text-lg">Audit & Activity Log</CardTitle>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                Immutable security and transaction log
+                Security and transaction ledger
               </p>
             </div>
             <Link
@@ -439,24 +438,24 @@ export function SuperAdminDashboard({
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            <div className="space-y-2.5">
               {auditLogs.slice(0, 4).map((log) => (
                 <div
                   key={log.id}
-                  className="flex items-start justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800"
+                  className="flex items-start justify-between p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 gap-2"
                 >
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100">
+                  <div className="space-y-0.5 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="text-xs font-bold text-slate-900 dark:text-slate-100 truncate">
                         {log.userName}
                       </span>
                       <Badge variant="secondary" size="sm">
                         {log.action.replace("_", " ")}
                       </Badge>
                     </div>
-                    <p className="text-xs text-slate-600 dark:text-slate-300">{log.details}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 line-clamp-2">{log.details}</p>
                   </div>
-                  <span className="text-[10px] text-slate-400 whitespace-nowrap">
+                  <span className="text-[10px] text-slate-400 whitespace-nowrap shrink-0">
                     {formatDate(log.timestamp, "dd MMM, hh:mm a")}
                   </span>
                 </div>

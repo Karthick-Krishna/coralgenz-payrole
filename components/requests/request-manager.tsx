@@ -38,6 +38,7 @@ import {
   AlertCircle,
   Eye,
   CreditCard,
+  ChevronRight,
 } from "lucide-react";
 
 interface RequestManagerProps {
@@ -92,7 +93,6 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
     employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
     "CGG-EMP-0002";
   const filteredRequests = requests.filter((req) => {
-    // If employee, only show own requests when in "my_requests" tab or if employee role
     if (isEmployee || activeTab === "my_requests") {
       if (req.employeeId !== myEmployeeId && req.employeeName !== user?.displayName) return false;
     }
@@ -139,8 +139,8 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
       payload.merchantName = merchantName;
       payload.expenseDate = new Date().toISOString().split("T")[0];
     } else if (requestType === "salary_advance") {
-      payload.repaymentMonths = Number(repaymentMonths);
-      payload.monthlyInstallment = amount ? Math.round(amount / Number(repaymentMonths)) : 0;
+      payload.repaymentMonths = repaymentMonths;
+      payload.monthlyInstallment = amount ? Math.round(amount / repaymentMonths) : 0;
     } else if (requestType === "letter_request") {
       payload.letterType = letterType;
       payload.purpose = purpose;
@@ -148,28 +148,27 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
       payload.regularizationDate = regDate;
       payload.suggestedCheckIn = regCheckIn;
       payload.suggestedCheckOut = regCheckOut;
-      payload.regularizationReason = description;
     } else if (requestType === "tax_declaration") {
-      payload.section80C = Number(section80C);
-      payload.section80D = Number(section80D);
-      payload.hraAnnualRent = Number(hraRent) * 12;
+      payload.section80C = section80C;
+      payload.section80D = section80D;
+      payload.hraAnnualRent = hraRent * 12;
     }
 
     MockDataStore.createRequest({
       organizationId: "org-coralgenz-01",
-      employeeId: currentEmp?.id || myEmployeeId,
-      employeeCode: currentEmp?.id || myEmployeeId,
-      employeeName: currentEmp ? `${currentEmp.firstName} ${currentEmp.lastName}` : (user?.displayName || "Employee"),
-      departmentName: currentEmp?.departmentName || "General",
+      employeeId: currentEmp.id,
+      employeeName: `${currentEmp.firstName} ${currentEmp.lastName}`,
+      employeeCode: currentEmp.id,
+      departmentName: currentEmp.departmentName,
       type: requestType,
       title,
       description,
-      amount: amount ? Number(amount) : undefined,
+      amount: amount || undefined,
       status: "pending",
       payload,
     });
 
-    success("Request Submitted", "Your request has been submitted to HR & Management.");
+    success("Request Submitted", "Your request has been submitted to HR/Finance for review.");
     setShowCreateModal(false);
     refreshData();
   };
@@ -180,21 +179,20 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
     MockDataStore.updateRequestStatus(
       reviewingRequest.id,
       status,
-      user?.id || "usr-admin-01",
-      user?.displayName || "Karthick Krishna",
+      user?.displayName || "Reviewer",
+      user?.id || "usr-01",
       reviewerComments
     );
 
     success(
-      `Request ${status === "approved" ? "Approved" : "Rejected"}`,
-      `Request "${reviewingRequest.title}" marked as ${status}.`
+      `Request ${status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Updated"}`,
+      `Ticket ${reviewingRequest.id} has been marked as ${status}.`
     );
     setReviewingRequest(null);
-    setReviewerComments("");
     refreshData();
   };
 
-  const statusBadgeVariant = (s: RequestStatus) => {
+  const statusBadgeVariant = (s: RequestStatus): "success" | "warning" | "danger" | "coral" | "secondary" => {
     switch (s) {
       case "approved":
       case "disbursed":
@@ -244,80 +242,81 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
       ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header & Quick Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
-            Requests & Self-Service Claims
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+            Requests & Claims
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Submit and track expense reimbursements, salary advances, tax declarations, and official HR certificates.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            Expense claims, advances, tax declarations, and letters
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <Button
             variant="coral"
             size="sm"
             onClick={() => handleOpenCreate()}
             leftIcon={<Plus className="w-4 h-4" />}
+            className="w-full sm:w-auto text-xs"
           >
-            Submit New Request
+            Submit Request
           </Button>
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+      {/* KPI Cards - 2x2 on mobile */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-4">
         <Card hoverEffect>
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-slate-400 uppercase">Total Tickets</p>
-              <h3 className="text-2xl font-black text-slate-900 dark:text-slate-100 mt-0.5">
+              <p className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase">Tickets</p>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-slate-100 mt-0.5">
                 {requests.length}
               </h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center">
-              <FileText className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 flex items-center justify-center shrink-0">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-amber-500 uppercase">Pending Review</p>
-              <h3 className="text-2xl font-black text-amber-500 mt-0.5">{totalPending}</h3>
+              <p className="text-[10px] sm:text-[11px] font-bold text-amber-500 uppercase">Pending</p>
+              <h3 className="text-xl sm:text-2xl font-black text-amber-500 mt-0.5">{totalPending}</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-500 flex items-center justify-center">
-              <Clock className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-500 flex items-center justify-center shrink-0">
+              <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-emerald-600 uppercase">Approved</p>
-              <h3 className="text-2xl font-black text-emerald-600 mt-0.5">{totalApproved}</h3>
+              <p className="text-[10px] sm:text-[11px] font-bold text-emerald-600 uppercase">Approved</p>
+              <h3 className="text-xl sm:text-2xl font-black text-emerald-600 mt-0.5">{totalApproved}</h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-600 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </CardContent>
         </Card>
 
         <Card hoverEffect>
-          <CardContent className="p-4 flex items-center justify-between">
+          <CardContent className="p-3 sm:p-4 flex items-center justify-between">
             <div>
-              <p className="text-[11px] font-bold text-purple-600 uppercase">Disbursed Claims</p>
-              <h3 className="text-2xl font-black text-purple-600 mt-0.5 font-mono">
+              <p className="text-[10px] sm:text-[11px] font-bold text-purple-600 uppercase">Disbursed</p>
+              <h3 className="text-base sm:text-xl font-black text-purple-600 mt-0.5 font-mono truncate max-w-[100px]">
                 {formatINR(totalClaimAmount)}
               </h3>
             </div>
-            <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 flex items-center justify-center">
-              <Receipt className="w-5 h-5" />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-purple-50 dark:bg-purple-950 text-purple-600 flex items-center justify-center shrink-0">
+              <Receipt className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </CardContent>
         </Card>
@@ -328,16 +327,17 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
 
       {/* Filter and Search Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3">
             <Input
-              placeholder="Search by title, employee name, ID..."
+              placeholder="Search title, employee..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               leftIcon={<Search className="w-4 h-4" />}
+              className="text-xs"
             />
 
-            <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)}>
+            <Select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value)} className="text-xs">
               <option value="all">All Request Categories</option>
               <option value="expense_claim">Expense Reimbursements</option>
               <option value="salary_advance">Salary Advances / Loans</option>
@@ -346,7 +346,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
               <option value="attendance_regularization">Attendance Regularization</option>
             </Select>
 
-            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>
+            <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="text-xs">
               <option value="all">All Statuses</option>
               <option value="pending">Pending</option>
               <option value="under_review">Under Review</option>
@@ -357,106 +357,177 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
         </CardContent>
       </Card>
 
-      {/* Requests Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Type</TableHead>
-            <TableHead>Title & Description</TableHead>
-            <TableHead>Requested By</TableHead>
-            <TableHead>Amount</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Date</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredRequests.length === 0 ? (
-            <tr>
-              <td colSpan={7}>
-                <TableEmptyState
-                  icon={<FileText className="w-8 h-8" />}
-                  title="No requests found"
-                  description="No employee requests match the selected filters."
-                />
-              </td>
-            </tr>
-          ) : (
-            filteredRequests.map((req) => (
-              <TableRow key={req.id}>
-                <TableCell>
-                  <div className="flex items-center gap-2">
-                    <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800">
-                      {typeIcon(req.type)}
-                    </div>
-                    <span className="text-xs font-semibold capitalize">
-                      {req.type.replace("_", " ")}
+      {/* Mobile Card List (< md) */}
+      <div className="block md:hidden space-y-3">
+        {filteredRequests.length === 0 ? (
+          <Card>
+            <CardContent className="p-6 text-center text-xs text-slate-400">
+              No employee requests match the selected filters.
+            </CardContent>
+          </Card>
+        ) : (
+          filteredRequests.map((req) => (
+            <div
+              key={req.id}
+              className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-2.5"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800 shrink-0">
+                    {typeIcon(req.type)}
+                  </div>
+                  <div className="min-w-0">
+                    <span className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate block">
+                      {req.title}
+                    </span>
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      {req.employeeName} ({req.employeeCode})
                     </span>
                   </div>
-                </TableCell>
+                </div>
 
-                <TableCell>
-                  <span className="font-bold text-slate-900 dark:text-slate-100 block">
-                    {req.title}
-                  </span>
-                  <span className="text-xs text-slate-500 line-clamp-1 max-w-sm">
-                    {req.description}
-                  </span>
-                </TableCell>
+                <Badge variant={statusBadgeVariant(req.status)} size="sm" dot>
+                  {req.status.replace("_", " ").toUpperCase()}
+                </Badge>
+              </div>
 
-                <TableCell>
-                  <span className="font-bold text-xs text-slate-900 dark:text-slate-100 block">
-                    {req.employeeName}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {req.employeeCode} • {req.departmentName}
-                  </span>
-                </TableCell>
+              {req.description && (
+                <p className="text-xs text-slate-500 dark:text-slate-400 line-clamp-2">
+                  {req.description}
+                </p>
+              )}
 
-                <TableCell>
-                  <span className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
+              <div className="flex items-center justify-between pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Amount</span>
+                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
                     {req.amount ? formatINR(req.amount) : "—"}
                   </span>
-                </TableCell>
+                </div>
 
-                <TableCell>
-                  <Badge variant={statusBadgeVariant(req.status)} size="sm" dot>
-                    {req.status.replace("_", " ").toUpperCase()}
-                  </Badge>
-                </TableCell>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setReviewingRequest(req);
+                    setReviewerComments(req.reviewerComments || "");
+                  }}
+                  className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1" />
+                  {canApprove && (req.status === "pending" || req.status === "under_review")
+                    ? "Review"
+                    : "Details"}
+                </Button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
 
-                <TableCell className="text-xs text-slate-500 whitespace-nowrap">
-                  {formatDate(req.createdAt)}
-                </TableCell>
+      {/* Desktop Requests Table (>= md) */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Type</TableHead>
+              <TableHead>Title & Description</TableHead>
+              <TableHead>Requested By</TableHead>
+              <TableHead>Amount</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Date</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredRequests.length === 0 ? (
+              <tr>
+                <td colSpan={7}>
+                  <TableEmptyState
+                    icon={<FileText className="w-8 h-8" />}
+                    title="No requests found"
+                    description="No employee requests match the selected filters."
+                  />
+                </td>
+              </tr>
+            ) : (
+              filteredRequests.map((req) => (
+                <TableRow key={req.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-2">
+                      <div className="p-2 rounded-xl bg-slate-100 dark:bg-slate-800">
+                        {typeIcon(req.type)}
+                      </div>
+                      <span className="text-xs font-semibold capitalize">
+                        {req.type.replace("_", " ")}
+                      </span>
+                    </div>
+                  </TableCell>
 
-                <TableCell className="text-right">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                      setReviewingRequest(req);
-                      setReviewerComments(req.reviewerComments || "");
-                    }}
-                    className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
-                  >
-                    <Eye className="w-3.5 h-3.5 mr-1" />
-                    {canApprove && (req.status === "pending" || req.status === "under_review")
-                      ? "Review"
-                      : "Details"}
-                  </Button>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+                  <TableCell>
+                    <span className="font-bold text-slate-900 dark:text-slate-100 block">
+                      {req.title}
+                    </span>
+                    <span className="text-xs text-slate-500 line-clamp-1 max-w-sm">
+                      {req.description}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="font-bold text-xs text-slate-900 dark:text-slate-100 block">
+                      {req.employeeName}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {req.employeeCode} • {req.departmentName}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">
+                      {req.amount ? formatINR(req.amount) : "—"}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge variant={statusBadgeVariant(req.status)} size="sm" dot>
+                      {req.status.replace("_", " ").toUpperCase()}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell className="text-xs text-slate-500 whitespace-nowrap">
+                    {formatDate(req.createdAt)}
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setReviewingRequest(req);
+                        setReviewerComments(req.reviewerComments || "");
+                      }}
+                      className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
+                    >
+                      <Eye className="w-3.5 h-3.5 mr-1" />
+                      {canApprove && (req.status === "pending" || req.status === "under_review")
+                        ? "Review"
+                        : "Details"}
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {/* MODAL: SUBMIT NEW REQUEST */}
       <Modal
         isOpen={showCreateModal}
         onClose={() => setShowCreateModal(false)}
         title="Submit Employee Request"
-        description="Choose request type and provide necessary documentation"
+        description="Choose request type and provide necessary details"
+        maxWidth="lg"
       >
         <form onSubmit={handleCreateSubmit} className="space-y-4">
           <Select
@@ -487,7 +558,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
 
           {/* Conditional Category Specific Fields */}
           {requestType === "expense_claim" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
               <Select
                 label="Expense Type"
                 value={expenseCategory}
@@ -521,7 +592,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
           )}
 
           {requestType === "salary_advance" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4 rounded-2xl bg-purple-50/50 dark:bg-purple-950/20 border border-purple-200 dark:border-purple-800">
               <Input
                 label="Requested Advance Amount (₹)"
                 type="number"
@@ -554,7 +625,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
           )}
 
           {requestType === "letter_request" && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
               <Select
                 label="Letter / Certificate Type"
                 value={letterType}
@@ -577,7 +648,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
           )}
 
           {requestType === "attendance_regularization" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 sm:p-4 rounded-2xl bg-rose-50/50 dark:bg-rose-950/20 border border-rose-200 dark:border-rose-800">
               <Input
                 label="Incident Date"
                 type="date"
@@ -601,9 +672,9 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
           )}
 
           {requestType === "tax_declaration" && (
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-3 sm:p-4 rounded-2xl bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
               <Input
-                label="Section 80C (PPF/ELSS/LIC ₹)"
+                label="Section 80C (PPF/ELSS ₹)"
                 type="number"
                 value={section80C}
                 onChange={(e) => setSection80C(Number(e.target.value))}
@@ -632,12 +703,12 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Provide context, justifications, or invoice invoice numbers..."
-              className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-xs focus:outline-none focus:ring-2 focus:ring-coral-500"
+              placeholder="Provide context, justifications, or invoice numbers..."
+              className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-3 text-xs focus:outline-none focus:ring-1 focus:ring-coral-500"
             />
           </div>
 
-          <div className="flex justify-end gap-2 pt-2">
+          <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
             <Button
               type="button"
               variant="outline"
@@ -647,7 +718,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
               Cancel
             </Button>
             <Button type="submit" variant="coral" size="sm">
-              Submit Ticket & Notify HR
+              Submit Request
             </Button>
           </div>
         </form>
@@ -657,17 +728,18 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
       <Modal
         isOpen={Boolean(reviewingRequest)}
         onClose={() => setReviewingRequest(null)}
-        title="Request Inspection & Decision"
-        description={`Ticket Ref: ${reviewingRequest?.id} • Submitted by ${reviewingRequest?.employeeName}`}
+        title="Request Decision & Details"
+        description={`Ticket: ${reviewingRequest?.id} • Submitted by ${reviewingRequest?.employeeName}`}
+        maxWidth="md"
       >
         {reviewingRequest && (
           <div className="space-y-4 text-xs">
             {/* Header info card */}
-            <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-2">
+            <div className="p-3.5 sm:p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 min-w-0">
                   {typeIcon(reviewingRequest.type)}
-                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100">
+                  <span className="font-bold text-sm text-slate-900 dark:text-slate-100 truncate">
                     {reviewingRequest.title}
                   </span>
                 </div>
@@ -714,16 +786,17 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
                     value={reviewerComments}
                     onChange={(e) => setReviewerComments(e.target.value)}
                     placeholder="Enter approval note or rejection reason..."
-                    className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs focus:outline-none focus:ring-2 focus:ring-coral-500"
+                    className="w-full rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 text-xs focus:outline-none focus:ring-1 focus:ring-coral-500"
                   />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
                     onClick={() => setReviewingRequest(null)}
+                    className="order-3 sm:order-1"
                   >
                     Close
                   </Button>
@@ -733,8 +806,9 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
                     size="sm"
                     onClick={() => handleReviewAction("rejected")}
                     leftIcon={<XCircle className="w-4 h-4" />}
+                    className="order-2"
                   >
-                    Reject Request
+                    Reject
                   </Button>
                   <Button
                     type="button"
@@ -742,8 +816,9 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
                     size="sm"
                     onClick={() => handleReviewAction("approved")}
                     leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                    className="order-1 sm:order-3"
                   >
-                    Approve & Disburse
+                    Approve
                   </Button>
                 </div>
               </div>

@@ -27,7 +27,7 @@ export function Tabs({
 }: TabsProps) {
   if (variant === "pills") {
     return (
-      <div className={cn("flex flex-wrap gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl", className)}>
+      <div className={cn("flex items-center gap-1.5 p-1 bg-slate-100 dark:bg-slate-800/80 rounded-2xl overflow-x-auto no-scrollbar touch-scroll", className)}>
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -36,7 +36,7 @@ export function Tabs({
               type="button"
               onClick={() => onChange(tab.id)}
               className={cn(
-                "flex items-center gap-2 px-3.5 py-1.5 text-xs font-semibold rounded-lg transition-all duration-150",
+                "flex items-center gap-2 px-3 sm:px-3.5 py-2 text-xs font-semibold rounded-xl transition-all duration-150 whitespace-nowrap shrink-0 min-h-[38px]",
                 isActive
                   ? "bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm"
                   : "text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200"
@@ -64,8 +64,8 @@ export function Tabs({
   }
 
   return (
-    <div className={cn("border-b border-slate-200 dark:border-slate-800", className)}>
-      <nav className="flex space-x-8 -mb-px overflow-x-auto">
+    <div className={cn("border-b border-slate-200 dark:border-slate-800 overflow-x-auto no-scrollbar touch-scroll", className)}>
+      <nav className="flex space-x-4 sm:space-x-8 -mb-px whitespace-nowrap min-w-max px-1">
         {tabs.map((tab) => {
           const isActive = activeTab === tab.id;
           return (
@@ -74,7 +74,7 @@ export function Tabs({
               type="button"
               onClick={() => onChange(tab.id)}
               className={cn(
-                "flex items-center gap-2 py-3 px-1 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap",
+                "flex items-center gap-2 py-3 px-1.5 text-xs sm:text-sm font-semibold border-b-2 transition-colors whitespace-nowrap shrink-0 min-h-[44px]",
                 isActive
                   ? "border-coral-500 text-coral-600 dark:text-coral-400"
                   : "border-transparent text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 hover:border-slate-300"

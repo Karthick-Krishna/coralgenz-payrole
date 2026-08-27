@@ -27,9 +27,11 @@ import {
   Filter,
   Eye,
   Edit,
-  UserX,
   Building2,
   Users,
+  Phone,
+  Mail,
+  ChevronRight,
 } from "lucide-react";
 
 interface EmployeeListProps {
@@ -101,23 +103,6 @@ export function EmployeeList({
     exportToCSV(exportData, "Coralgenz_Employees_Roster");
   };
 
-  const handleExportExcel = () => {
-    const exportData = filteredEmployees.map((e) => ({
-      "Employee ID": e.id,
-      "Full Name": `${e.firstName} ${e.lastName}`,
-      Email: e.email,
-      Phone: e.phone,
-      Department: e.departmentName,
-      Designation: e.designationTitle,
-      "Employment Type": e.employmentType,
-      Status: e.status,
-      "Joining Date": e.joiningDate,
-      "Monthly Gross (INR)": e.currentMonthlyGross,
-      "Annual CTC (INR)": e.currentAnnualCtc,
-    }));
-    exportToExcel(exportData, "Coralgenz_Employees_Roster", "Employees");
-  };
-
   const statusBadges: Record<EmployeeStatus, { variant: "success" | "warning" | "danger" | "secondary"; label: string }> = {
     active: { variant: "success", label: "Active" },
     probation: { variant: "warning", label: "Probation" },
@@ -129,24 +114,25 @@ export function EmployeeList({
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* Header with Title and Primary Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Employee Directory
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            Manage organization employees, roles, departments, salary profiles, and employment documents.
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+            {filteredEmployees.length} total staff members in Tamil Nadu
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5">
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
             leftIcon={<Download className="w-4 h-4" />}
+            className="flex-1 sm:flex-none text-xs"
           >
             Export CSV
           </Button>
@@ -155,6 +141,7 @@ export function EmployeeList({
             size="sm"
             onClick={() => router.push("/employees/new")}
             leftIcon={<Plus className="w-4 h-4" />}
+            className="flex-1 sm:flex-none text-xs"
           >
             Add Employee
           </Button>
@@ -163,20 +150,22 @@ export function EmployeeList({
 
       {/* Filter and Search Bar */}
       <Card>
-        <CardContent className="p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <CardContent className="p-3 sm:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
             {/* Search Input */}
             <Input
-              placeholder="Search by name, ID, email..."
+              placeholder="Search name, ID, designation..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               leftIcon={<Search className="w-4 h-4" />}
+              className="text-xs"
             />
 
             {/* Department Filter */}
             <Select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
+              className="text-xs"
             >
               <option value="all">All Departments ({departments.length})</option>
               {departments.map((dept) => (
@@ -190,6 +179,7 @@ export function EmployeeList({
             <Select
               value={selectedStatus}
               onChange={(e) => setSelectedStatus(e.target.value)}
+              className="text-xs"
             >
               <option value="all">All Statuses</option>
               <option value="active">Active</option>
@@ -203,6 +193,7 @@ export function EmployeeList({
             <Select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as "name" | "date" | "salary")}
+              className="text-xs"
             >
               <option value="name">Sort by Name (A-Z)</option>
               <option value="date">Sort by Joining Date</option>
@@ -212,135 +203,245 @@ export function EmployeeList({
         </CardContent>
       </Card>
 
-      {/* Employees Table */}
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Employee</TableHead>
-            <TableHead>Employee ID</TableHead>
-            <TableHead>Department</TableHead>
-            <TableHead>Designation</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Monthly Gross</TableHead>
-            <TableHead>Joining Date</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {filteredEmployees.length === 0 ? (
-            <tr>
-              <td colSpan={8}>
-                <TableEmptyState
-                  icon={<Users className="w-8 h-8" />}
-                  title="No employees found"
-                  description="No employee records match your current filter criteria."
-                  action={
-                    <Button
-                      variant="coral"
-                      size="sm"
-                      onClick={() => {
-                        setSearchQuery("");
-                        setSelectedDept("all");
-                        setSelectedStatus("all");
-                      }}
-                    >
-                      Reset Filters
-                    </Button>
-                  }
-                />
-              </td>
-            </tr>
-          ) : (
-            filteredEmployees.map((emp) => (
-              <TableRow key={emp.id}>
-                <TableCell>
-                  <div className="flex items-center gap-3">
-                    <div className="w-9 h-9 rounded-full overflow-hidden bg-sky-100 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                      {emp.avatarUrl ? (
-                        <img src={emp.avatarUrl} alt={emp.firstName} className="w-full h-full object-cover" />
-                      ) : (
-                        getInitials(`${emp.firstName} ${emp.lastName}`)
-                      )}
-                    </div>
-                    <div>
-                      <Link
-                        href={`/employees/${emp.id}`}
-                        className="font-bold text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors"
-                      >
-                        {emp.firstName} {emp.lastName}
-                      </Link>
-                      <p className="text-xs text-slate-400">{emp.email}</p>
-                    </div>
+      {/* Mobile Card Grid View (Shown on mobile screens < md) */}
+      <div className="block md:hidden space-y-3">
+        {filteredEmployees.length === 0 ? (
+          <Card>
+            <CardContent className="p-6">
+              <TableEmptyState
+                icon={<Users className="w-8 h-8" />}
+                title="No employees found"
+                description="No employee records match your current filter criteria."
+                action={
+                  <Button
+                    variant="coral"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setSelectedDept("all");
+                      setSelectedStatus("all");
+                    }}
+                  >
+                    Reset Filters
+                  </Button>
+                }
+              />
+            </CardContent>
+          </Card>
+        ) : (
+          filteredEmployees.map((emp) => (
+            <div
+              key={emp.id}
+              className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3 transition-all active:scale-[0.99]"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="w-11 h-11 rounded-2xl overflow-hidden bg-sky-100 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                    {emp.avatarUrl ? (
+                      <img src={emp.avatarUrl} alt={emp.firstName} className="w-full h-full object-cover" />
+                    ) : (
+                      getInitials(`${emp.firstName} ${emp.lastName}`)
+                    )}
                   </div>
-                </TableCell>
+                  <div className="min-w-0">
+                    <Link
+                      href={`/employees/${emp.id}`}
+                      className="font-bold text-sm text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors truncate block"
+                    >
+                      {emp.firstName} {emp.lastName}
+                    </Link>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                      {emp.designationTitle}
+                    </p>
+                  </div>
+                </div>
 
-                <TableCell>
-                  <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                    {emp.id}
-                  </span>
-                </TableCell>
+                <Badge
+                  variant={statusBadges[emp.status]?.variant || "secondary"}
+                  size="sm"
+                  dot
+                >
+                  {statusBadges[emp.status]?.label || emp.status}
+                </Badge>
+              </div>
 
-                <TableCell>
-                  <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+              <div className="grid grid-cols-2 gap-2 text-xs py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Department</span>
+                  <span className="font-medium text-slate-700 dark:text-slate-300 truncate block">
                     {emp.departmentName}
                   </span>
-                </TableCell>
-
-                <TableCell>
-                  <span className="text-xs text-slate-600 dark:text-slate-400">
-                    {emp.designationTitle}
-                  </span>
-                </TableCell>
-
-                <TableCell>
-                  <Badge
-                    variant={statusBadges[emp.status]?.variant || "secondary"}
-                    size="sm"
-                    dot
-                  >
-                    {statusBadges[emp.status]?.label || emp.status}
-                  </Badge>
-                </TableCell>
-
-                <TableCell>
-                  <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
+                </div>
+                <div>
+                  <span className="text-[10px] text-slate-400 block">Monthly Gross</span>
+                  <span className="font-bold font-mono text-slate-900 dark:text-slate-100">
                     {formatINR(emp.currentMonthlyGross)}
                   </span>
-                </TableCell>
+                </div>
+              </div>
 
-                <TableCell>
-                  <span className="text-xs text-slate-500">
-                    {formatDate(emp.joiningDate)}
-                  </span>
-                </TableCell>
+              <div className="flex items-center justify-between pt-1 gap-2 border-t border-slate-100 dark:border-slate-800">
+                <span className="text-[11px] font-mono text-slate-400">
+                  {emp.id}
+                </span>
 
-                <TableCell className="text-right">
-                  <div className="flex items-center justify-end gap-1.5">
-                    <Button
-                      variant="ghost"
+                <div className="flex items-center gap-1.5">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => router.push(`/employees/${emp.id}?edit=true`)}
+                    className="h-8 px-2.5 text-xs"
+                  >
+                    <Edit className="w-3.5 h-3.5 mr-1" />
+                    Edit
+                  </Button>
+                  <Button
+                    variant="coral"
+                    size="sm"
+                    onClick={() => router.push(`/employees/${emp.id}`)}
+                    className="h-8 px-2.5 text-xs"
+                  >
+                    View
+                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      {/* Desktop Employees Table (Shown on screens >= md) */}
+      <div className="hidden md:block">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Employee</TableHead>
+              <TableHead>Employee ID</TableHead>
+              <TableHead>Department</TableHead>
+              <TableHead>Designation</TableHead>
+              <TableHead>Status</TableHead>
+              <TableHead>Monthly Gross</TableHead>
+              <TableHead>Joining Date</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredEmployees.length === 0 ? (
+              <tr>
+                <td colSpan={8}>
+                  <TableEmptyState
+                    icon={<Users className="w-8 h-8" />}
+                    title="No employees found"
+                    description="No employee records match your current filter criteria."
+                    action={
+                      <Button
+                        variant="coral"
+                        size="sm"
+                        onClick={() => {
+                          setSearchQuery("");
+                          setSelectedDept("all");
+                          setSelectedStatus("all");
+                        }}
+                      >
+                        Reset Filters
+                      </Button>
+                    }
+                  />
+                </td>
+              </tr>
+            ) : (
+              filteredEmployees.map((emp) => (
+                <TableRow key={emp.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-full overflow-hidden bg-sky-100 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                        {emp.avatarUrl ? (
+                          <img src={emp.avatarUrl} alt={emp.firstName} className="w-full h-full object-cover" />
+                        ) : (
+                          getInitials(`${emp.firstName} ${emp.lastName}`)
+                        )}
+                      </div>
+                      <div>
+                        <Link
+                          href={`/employees/${emp.id}`}
+                          className="font-bold text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors"
+                        >
+                          {emp.firstName} {emp.lastName}
+                        </Link>
+                        <p className="text-xs text-slate-400">{emp.email}</p>
+                      </div>
+                    </div>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+                      {emp.id}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                      {emp.departmentName}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-xs text-slate-600 dark:text-slate-400">
+                      {emp.designationTitle}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <Badge
+                      variant={statusBadges[emp.status]?.variant || "secondary"}
                       size="sm"
-                      onClick={() => router.push(`/employees/${emp.id}`)}
-                      title="View Profile"
-                      className="h-8 px-2"
+                      dot
                     >
-                      <Eye className="w-4 h-4 text-slate-500 hover:text-slate-900" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => router.push(`/employees/${emp.id}?edit=true`)}
-                      title="Edit Employee"
-                      className="h-8 px-2"
-                    >
-                      <Edit className="w-4 h-4 text-slate-500 hover:text-slate-900" />
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+                      {statusBadges[emp.status]?.label || emp.status}
+                    </Badge>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
+                      {formatINR(emp.currentMonthlyGross)}
+                    </span>
+                  </TableCell>
+
+                  <TableCell>
+                    <span className="text-xs text-slate-500">
+                      {formatDate(emp.joiningDate)}
+                    </span>
+                  </TableCell>
+
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(`/employees/${emp.id}`)}
+                        title="View Profile"
+                        className="h-8 px-2"
+                      >
+                        <Eye className="w-4 h-4 text-slate-500 hover:text-slate-900" />
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => router.push(`/employees/${emp.id}?edit=true`)}
+                        title="Edit Employee"
+                        className="h-8 px-2"
+                      >
+                        <Edit className="w-4 h-4 text-slate-500 hover:text-slate-900" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
