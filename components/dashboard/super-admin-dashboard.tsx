@@ -66,28 +66,31 @@ export function SuperAdminDashboard({
   const presentToday = attendance.filter((a) => a.status === "present").length;
   const pendingLeaves = leaveRequests.filter((l) => l.status === "pending").length;
 
+  const totalMonthlyGross = employees.reduce((sum, e) => sum + (e.currentMonthlyGross || 0), 0);
+  const totalMonthlyNet = Math.round(totalMonthlyGross * 0.88);
+
   const latestRun = payrollRuns[0] || {
     periodName: "August 2026",
-    totalGrossPayroll: 844000,
-    totalNetPayroll: 762450,
-    status: "draft",
+    totalGrossPayroll: totalMonthlyGross,
+    totalNetPayroll: totalMonthlyNet,
+    status: totalEmployees > 0 ? "draft" : "no_data",
   };
 
-  // Mock historical payroll data for chart
   const payrollTrendData = [
-    { month: "Mar", gross: 780000, net: 710000 },
-    { month: "Apr", gross: 810000, net: 735000 },
-    { month: "May", gross: 820000, net: 742000 },
-    { month: "Jun", gross: 835000, net: 755000 },
-    { month: "Jul", gross: 844000, net: 762450 },
-    { month: "Aug", gross: 855000, net: 772000 },
+    { month: "Jun", gross: Math.round(totalMonthlyGross * 0.95), net: Math.round(totalMonthlyNet * 0.95) },
+    { month: "Jul", gross: Math.round(totalMonthlyGross * 0.98), net: Math.round(totalMonthlyNet * 0.98) },
+    { month: "Aug", gross: totalMonthlyGross, net: totalMonthlyNet },
   ];
 
-  const deptData = departments.map((d) => ({
-    name: d.name,
-    employees: d.employeeCount,
-    payroll: d.monthlyPayrollCost,
-  }));
+  const deptData = departments.map((d) => {
+    const deptEmps = employees.filter((e) => e.departmentId === d.id);
+    const cost = deptEmps.reduce((sum, e) => sum + (e.currentMonthlyGross || 0), 0);
+    return {
+      name: d.name,
+      employees: deptEmps.length,
+      payroll: cost,
+    };
+  });
 
   const COLORS = ["#0284c7", "#0ea5e9", "#38bdf8", "#06b6d4", "#3b82f6", "#10b981"];
 

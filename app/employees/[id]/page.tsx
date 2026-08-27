@@ -6,6 +6,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { EmployeeProfile } from "@/components/employees/employee-profile";
 import { EmployeeForm } from "@/components/employees/employee-form";
 import { MockDataStore } from "@/lib/store/mock-store";
+import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Employee, Department, Designation } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
@@ -17,21 +18,22 @@ function EmployeeDetailContent() {
   const id = typeof params?.id === "string" ? params.id : "";
   const isEditingParam = searchParams?.get("edit") === "true";
 
-  const [employee, setEmployee] = useState<Employee | null>(() => {
-    if (!id) return null;
-    return MockDataStore.getEmployeeById(id) || null;
-  });
-  const [departments, setDepartments] = useState<Department[]>(() => MockDataStore.getDepartments());
-  const [designations, setDesignations] = useState<Designation[]>(() => MockDataStore.getDesignations());
-  const [allEmployees, setAllEmployees] = useState<Employee[]>(() => MockDataStore.getEmployees());
+  const [employee, setEmployee] = useState<Employee | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
+  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = () => {
+  const loadData = async () => {
     if (!id) return;
-    const emp = MockDataStore.getEmployeeById(id);
+    setIsLoading(true);
+    const emp = await EmployeeService.getEmployeeById(id);
+    const emps = await EmployeeService.getEmployees();
     setEmployee(emp || null);
+    setAllEmployees(emps);
     setDepartments(MockDataStore.getDepartments());
     setDesignations(MockDataStore.getDesignations());
-    setAllEmployees(MockDataStore.getEmployees());
+    setIsLoading(false);
   };
 
   useEffect(() => {
@@ -39,6 +41,14 @@ function EmployeeDetailContent() {
     window.addEventListener("coralgenz_store_updated", loadData);
     return () => window.removeEventListener("coralgenz_store_updated", loadData);
   }, [id]);
+
+  if (isLoading) {
+    return (
+      <div className="flex h-64 items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-sky-500"></div>
+      </div>
+    );
+  }
 
   if (!employee) {
     return (

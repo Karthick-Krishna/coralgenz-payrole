@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Employee, Department, Designation, EmploymentType, EmployeeStatus, UserRole } from "@/types";
 import { MockDataStore } from "@/lib/store/mock-store";
 import { AuthService } from "@/lib/firebase/auth-service";
+import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -278,7 +279,7 @@ export function EmployeeForm({
       };
 
       if (isEditing && initialData) {
-        MockDataStore.updateEmployee(initialData.id, payload);
+        await EmployeeService.updateEmployee(initialData.id, payload);
 
         // 1. Update password on Auth server if changed or provided
         if (formData.portalPassword && formData.portalPassword.trim()) {
@@ -290,24 +291,15 @@ export function EmployeeForm({
           });
         }
 
-        // 2. Synchronize user profile & assigned system role
-        MockDataStore.provisionEmployeeUser({
-          email: formData.email,
-          password: formData.portalPassword || undefined,
-          role: formData.portalRole,
-          employeeId: initialData.id,
-          displayName: `${formData.firstName} ${formData.lastName}`,
-          photoURL: formData.avatarUrl || undefined,
-          phone: formData.phone || undefined,
-          gender: formData.gender,
-          createdBy: "Super Admin",
-        });
-
         success("Profile & Credentials Updated", `Updated details and auth credentials on server for ${formData.firstName} ${formData.lastName}`);
         router.push(`/employees/${initialData.id}`);
       } else {
         // 1. Save Employee into Database / Store
-        const newEmp = MockDataStore.addEmployee(payload);
+        const newEmp = await EmployeeService.addEmployee(payload);
+        
+        if (!newEmp) {
+          throw new Error("Failed to create employee in database.");
+        }
 
         // 2. Provision Auth Credentials on Auth Server & User Registry
         await AuthService.provisionUser({

@@ -54,11 +54,11 @@ const STORAGE_KEYS = {
   SALARY_STRUCTURES: "coralgenz_salary_structures",
   USERS: "coralgenz_users",
   CREDENTIALS: "coralgenz_credentials",
-  INITIALIZED: "coralgenz_store_init_v6",
+  INITIALIZED: "coralgenz_production_store_v1",
 };
 
 /**
- * Generate initial sample attendance and payroll items
+ * Generate initial empty attendance and payroll items
  */
 function createInitialAttendanceAndPayroll(): {
   attendance: AttendanceRecord[];
@@ -66,111 +66,11 @@ function createInitialAttendanceAndPayroll(): {
   payrollItems: PayrollItem[];
   payslips: Payslip[];
 } {
-  const attendance: AttendanceRecord[] = [];
-  const todayStr = "2026-08-26";
-
-  // Create today's attendance for demo employees
-  DEMO_EMPLOYEES.forEach((emp, index) => {
-    const isPresent = index !== 1 && index !== 7 && index !== 14; // A few on leave / absent
-    attendance.push({
-      id: `att-today-${emp.id}`,
-      organizationId: "org-coralgenz-01",
-      employeeId: emp.id,
-      employeeName: `${emp.firstName} ${emp.lastName}`,
-      departmentId: emp.departmentId,
-      date: todayStr,
-      checkIn: isPresent ? (index % 3 === 0 ? "09:12:00" : "08:58:00") : undefined,
-      checkOut: isPresent && index % 2 === 0 ? "18:15:00" : undefined,
-      workHoursMinutes: isPresent ? 510 : 0,
-      overtimeMinutes: index === 0 ? 60 : 0,
-      status: isPresent ? "present" : index === 1 ? "leave" : "absent",
-      isLateArrival: index % 3 === 0,
-      isEarlyDeparture: false,
-      workMode: "office",
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    });
-  });
-
-  const julyPayrollItems: PayrollItem[] = [];
-  const julyPayslips: Payslip[] = [];
-  let totalGross = 0;
-  let totalDeductions = 0;
-  let totalNet = 0;
-  let totalPf = 0;
-  let totalEsi = 0;
-  let totalTds = 0;
-
-  // Temporary run placeholder for ID reference
-  const tempRunId = "pr-2026-07";
-
-  DEMO_EMPLOYEES.forEach((emp, index) => {
-    const calc = calculateEmployeePayroll(emp, {
-      workingDays: 22,
-      presentDays: 21,
-      leaveDays: 1,
-      lossOfPayDays: 0,
-      overtimeHours: index === 0 ? 5 : 0,
-      bonusAmount: index === 0 ? 5000 : 0,
-    });
-
-    totalGross += calc.grossSalary;
-    totalDeductions += calc.totalDeductions;
-    totalNet += calc.netSalary;
-    totalPf += calc.providentFund;
-    totalEsi += calc.esi;
-    totalTds += calc.incomeTaxTDS;
-
-    const item: PayrollItem = {
-      ...calc,
-      id: `pi-july-${emp.id}`,
-      payrollRunId: tempRunId,
-      organizationId: "org-coralgenz-01",
-      status: "paid",
-    };
-    julyPayrollItems.push(item);
-  });
-
-  // Create previous month (July 2026) locked payroll run
-  const julyPayrollRun: PayrollRun = {
-    id: tempRunId,
-    organizationId: "org-coralgenz-01",
-    month: 7,
-    year: 2026,
-    periodName: "July 2026",
-    startDate: "2026-07-01",
-    endDate: "2026-07-31",
-    paymentDate: "2026-08-01",
-    status: "paid",
-    totalEmployees: DEMO_EMPLOYEES.length,
-    totalGrossPayroll: Math.round(totalGross),
-    totalDeductions: Math.round(totalDeductions),
-    totalNetPayroll: Math.round(totalNet),
-    totalPfContribution: Math.round(totalPf),
-    totalEsiContribution: Math.round(totalEsi),
-    totalTdsDeduction: Math.round(totalTds),
-    processedCount: DEMO_EMPLOYEES.length,
-    approvedBy: "usr-superadmin-01",
-    approvedByName: "Karthick Krishna",
-    approvedAt: "2026-08-01T12:00:00.000Z",
-    lockedBy: "usr-payroll-01",
-    lockedByName: "Thanvanth H",
-    lockedAt: "2026-08-01T14:30:00.000Z",
-    createdAt: "2026-07-30T10:00:00.000Z",
-    updatedAt: "2026-08-01T14:30:00.000Z",
-  };
-
-  julyPayrollItems.forEach((item, index) => {
-    const emp = DEMO_EMPLOYEES[index];
-    const payslip = generatePayslipFromItem(item, julyPayrollRun, emp, index + 1);
-    julyPayslips.push(payslip);
-  });
-
   return {
-    attendance,
-    payrollRuns: [julyPayrollRun],
-    payrollItems: julyPayrollItems,
-    payslips: julyPayslips,
+    attendance: [],
+    payrollRuns: [],
+    payrollItems: [],
+    payslips: [],
   };
 }
 

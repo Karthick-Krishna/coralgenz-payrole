@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { MockDataStore } from "@/lib/store/mock-store";
+import { EmployeeService } from "@/lib/firebase/employee-service";
 import { AppLayout } from "@/components/layout/app-layout";
 import { SuperAdminDashboard } from "@/components/dashboard/super-admin-dashboard";
 import { HRDashboard } from "@/components/dashboard/hr-dashboard";
@@ -35,8 +36,9 @@ export default function DashboardPage() {
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
 
-  const loadData = () => {
-    setEmployees(MockDataStore.getEmployees());
+  const loadData = async () => {
+    const emps = await EmployeeService.getEmployees();
+    setEmployees(emps);
     setPayrollRuns(MockDataStore.getPayrollRuns());
     setAttendance(MockDataStore.getAttendance());
     setLeaveRequests(MockDataStore.getLeaveRequests());
