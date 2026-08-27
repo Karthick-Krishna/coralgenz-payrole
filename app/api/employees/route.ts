@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { db, firebaseConfig } from '@/lib/firebase/config';
 import { collection, doc, getDocs, setDoc, addDoc } from 'firebase/firestore';
+import { FirestoreRest } from '@/lib/firebase/firestore-rest';
 import { serverEmployeeCache } from '@/lib/server/employee-store';
 import { Employee, UserRole } from '@/types';
 
@@ -20,7 +21,6 @@ export async function GET() {
           }
         });
         if (employees.length > 0) {
-          // Sync server cache
           employees.forEach((e) => serverEmployeeCache.set(e.id, e));
           return NextResponse.json({ success: true, employees });
         }
@@ -48,7 +48,17 @@ export async function GET() {
       }
     }
 
-    // 3. Fallback to server memory cache
+    // 3. Try Google Cloud Firestore REST API (Vercel Serverless)
+    try {
+      const restEmployees = await FirestoreRest.getEmployees();
+      if (restEmployees && restEmployees.length > 0) {
+        const active = restEmployees.filter((e) => e.status !== 'inactive');
+        active.forEach((e) => serverEmployeeCache.set(e.id, e));
+        return NextResponse.json({ success: true, employees: active });
+      }
+    } catch {}
+
+    // 4. Fallback to server memory cache
     const cached = Array.from(serverEmployeeCache.values()).filter((e) => e.status !== 'inactive');
     return NextResponse.json({ success: true, employees: cached });
   } catch (error: any) {
@@ -102,10 +112,10 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     };
 
-    // Store in shared server cache immediately
+    // Store in shared cache
     serverEmployeeCache.set(nextId, newEmp);
 
-    // 2. Save Employee Document in Firestore
+    // 2. Save Employee Document across all Firestore layers
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
         await adminDb.collection('employees').doc(nextId).set(newEmp, { merge: true });
@@ -122,7 +132,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // 3. Provision Real Firebase Authentication User
+    // Google Cloud Firestore REST API
+    try {
+      await FirestoreRest.setEmployee(nextId, newEmp);
+    } catch {}
+
+    // 3. Provision Real Firebase Authentication User on Google Auth Server
     let uid = `usr-${nextId.toLowerCase()}`;
 
     // A. Via Firebase Admin SDK if available
@@ -149,7 +164,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // B. Via Firebase Auth REST API (Works directly using Web API key without service account!)
+    // B. Via Firebase Auth REST API (Works directly on Vercel without service account!)
     if (uid.startsWith('usr-') && firebaseConfig.apiKey) {
       try {
         const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, updateDoc } from 'firebase/firestore';
+import { FirestoreRest } from '@/lib/firebase/firestore-rest';
 import { serverEmployeeCache } from '@/lib/server/employee-store';
 import { Employee } from '@/types';
 
@@ -37,7 +38,16 @@ export async function GET(
       } catch {}
     }
 
-    // 3. Try Server Cache
+    // 3. Try Cloud Firestore REST
+    try {
+      const restEmp = await FirestoreRest.getEmployee(id);
+      if (restEmp) {
+        serverEmployeeCache.set(id, restEmp);
+        return NextResponse.json({ success: true, employee: restEmp });
+      }
+    } catch {}
+
+    // 4. Try Server Cache
     if (serverEmployeeCache.has(id)) {
       return NextResponse.json({ success: true, employee: serverEmployeeCache.get(id) });
     }
@@ -62,7 +72,11 @@ export async function PUT(
 
     if (serverEmployeeCache.has(id)) {
       const existing = serverEmployeeCache.get(id)!;
-      serverEmployeeCache.set(id, { ...existing, ...updates });
+      const updated = { ...existing, ...updates };
+      serverEmployeeCache.set(id, updated);
+      try {
+        await FirestoreRest.setEmployee(id, updated);
+      } catch {}
     }
 
     // 1. Try Admin Firestore
@@ -100,7 +114,11 @@ export async function DELETE(
 
     if (serverEmployeeCache.has(id)) {
       const existing = serverEmployeeCache.get(id)!;
-      serverEmployeeCache.set(id, { ...existing, ...updates });
+      const updated = { ...existing, ...updates };
+      serverEmployeeCache.set(id, updated);
+      try {
+        await FirestoreRest.setEmployee(id, updated);
+      } catch {}
     }
 
     if (adminDb && typeof adminDb.collection === 'function') {
