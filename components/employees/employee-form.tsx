@@ -181,10 +181,6 @@ export function EmployeeForm({
           updated.email = `${fn.toLowerCase().replace(/\s+/g, "")}.${ln.toLowerCase().replace(/\s+/g, "")}@coralgenz.co.in`;
         }
       }
-      // Auto-update system role when designation changes (only for Super Admins)
-      if (field === "designationId" && !isEditing) {
-        updated.portalRole = isSuperAdmin ? inferRoleFromDesignation(value as string, prev.departmentId) : "employee";
-      }
       return updated;
     });
   };
@@ -192,12 +188,10 @@ export function EmployeeForm({
   const handleDepartmentChange = (deptId: string) => {
     const validDesig = designations.find((d) => d.departmentId === deptId);
     const nextDesigId = validDesig ? validDesig.id : formData.designationId;
-    const suggestedRole = isSuperAdmin ? inferRoleFromDesignation(nextDesigId, deptId) : "employee";
     setFormData((prev) => ({
       ...prev,
       departmentId: deptId,
       designationId: nextDesigId,
-      portalRole: isEditing ? (isSuperAdmin ? prev.portalRole : "employee") : suggestedRole,
     }));
   };
 

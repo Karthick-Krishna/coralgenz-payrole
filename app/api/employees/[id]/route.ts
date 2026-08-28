@@ -87,7 +87,23 @@ export async function PUT(
       (changedByName || createdBy)?.toLowerCase() === 'super admin' || 
       (changedByName || createdBy)?.toLowerCase() === 'karthick krishna';
 
-    const existingEmp = serverEmployeeCache.get(id);
+    let existingEmp = serverEmployeeCache.get(id);
+
+    if (!existingEmp) {
+      if (adminDb && typeof adminDb.collection === 'function') {
+        try {
+          const snap = await adminDb.collection('employees').doc(id).get();
+          if (snap.exists) existingEmp = snap.data() as Employee;
+        } catch {}
+      }
+      if (!existingEmp && db) {
+        try {
+          const docSnap = await getDoc(doc(db, 'employees', id));
+          if (docSnap.exists()) existingEmp = docSnap.data() as Employee;
+        } catch {}
+      }
+    }
+
     if (portalRole || updates.role) {
       if (isSuperAdmin) {
         updates.role = (portalRole || updates.role) as UserRole;
@@ -95,6 +111,9 @@ export async function PUT(
       } else if (existingEmp?.role) {
         updates.role = existingEmp.role;
         updates.portalRole = existingEmp.role;
+      } else {
+        updates.role = 'employee';
+        updates.portalRole = 'employee';
       }
     }
 
@@ -297,6 +316,13 @@ export async function DELETE(
         await deleteDoc(doc(db, 'users', id));
         await deleteDoc(doc(db, 'users', `usr-${id.toLowerCase()}`));
         await deleteDoc(doc(db, 'leaveBalances', `lb-${id}-2026`));
+
+        // Delete the actual user document that maps to the employee ID
+        const q = query(collection(db, 'users'), where('employeeId', '==', id));
+        const userDocs = await getDocs(q);
+        for (const userDoc of userDocs.docs) {
+          await deleteDoc(doc(db, 'users', userDoc.id));
+        }
       } catch (clientErr: any) {
         console.warn('Client Firestore delete notice:', clientErr.message);
       }
