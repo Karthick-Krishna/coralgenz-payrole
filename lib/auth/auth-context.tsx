@@ -132,35 +132,50 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   useEffect(() => {
+    // Failsafe timeout to prevent infinite loading in case of network latency
+    const failsafeTimer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1200);
+
     if (isFirebaseConfigured && firebaseAuth) {
       const unsubscribe = onAuthStateChanged(firebaseAuth, async (fbUser) => {
-        if (fbUser) {
-          const email = fbUser.email?.toLowerCase().trim() || "";
-          const profile = await resolveUserProfile(fbUser.uid, email);
+        try {
+          if (fbUser) {
+            const email = fbUser.email?.toLowerCase().trim() || "";
+            const profile = await resolveUserProfile(fbUser.uid, email);
 
-          const matchedUser: User = {
-            id: fbUser.uid,
-            email: fbUser.email || email,
-            displayName: profile.displayName,
-            role: profile.role,
-            employeeId: profile.employeeId,
-            organizationId: "org-coralgenz-01",
-            photoURL: fbUser.photoURL || profile.photoURL,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            isActive: true,
-          };
-          setUser(matchedUser);
-          setBaseRole(profile.role);
-          setIsDemoMode(false);
-        } else {
-          setUser(null);
+            const matchedUser: User = {
+              id: fbUser.uid,
+              email: fbUser.email || email,
+              displayName: profile.displayName,
+              role: profile.role,
+              employeeId: profile.employeeId,
+              organizationId: "org-coralgenz-01",
+              photoURL: fbUser.photoURL || profile.photoURL,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+              isActive: true,
+            };
+            setUser(matchedUser);
+            setBaseRole(profile.role);
+            setIsDemoMode(false);
+          } else {
+            setUser(null);
+          }
+        } catch (authErr) {
+          console.warn("Auth initialization notice:", authErr);
+        } finally {
+          setIsLoading(false);
+          clearTimeout(failsafeTimer);
         }
-        setIsLoading(false);
       });
-      return () => unsubscribe();
+      return () => {
+        unsubscribe();
+        clearTimeout(failsafeTimer);
+      };
     } else {
       setIsLoading(false);
+      clearTimeout(failsafeTimer);
     }
   }, []);
 

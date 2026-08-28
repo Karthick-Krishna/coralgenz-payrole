@@ -3,7 +3,6 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
-import { DashboardSkeleton } from "@/components/ui/skeleton";
 
 export default function HomePage() {
   const router = useRouter();
@@ -18,6 +17,18 @@ export default function HomePage() {
       }
     }
   }, [user, isLoading, router]);
+
+  // Fast failsafe redirect after 800ms
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (user) {
+        router.replace("/dashboard");
+      } else {
+        router.replace("/login");
+      }
+    }, 800);
+    return () => clearTimeout(timeout);
+  }, [user, router]);
 
   return (
     <div className="flex items-center justify-center min-h-screen p-8 bg-slate-900 text-white">
