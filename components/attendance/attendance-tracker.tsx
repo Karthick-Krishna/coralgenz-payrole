@@ -65,18 +65,21 @@ export function AttendanceTracker({
   const [editStatus, setEditStatus] = useState<AttendanceRecord["status"]>("present");
   const [overrideReason, setOverrideReason] = useState("Biometric device sync correction");
 
+  useEffect(() => {
+    setAttendance(initialAttendance);
+  }, [initialAttendance]);
+
   const refreshData = async () => {
     try {
       const list = await AttendanceService.getAttendance();
       setAttendance(list);
     } catch {}
-    if (onRefresh) onRefresh();
   };
 
   useEffect(() => {
-    refreshData();
-    window.addEventListener("coralgenz_store_updated", refreshData);
-    return () => window.removeEventListener("coralgenz_store_updated", refreshData);
+    const handleStoreUpdate = () => refreshData();
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
   }, []);
 
   const myEmpId =

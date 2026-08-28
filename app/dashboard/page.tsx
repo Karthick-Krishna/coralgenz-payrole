@@ -42,8 +42,8 @@ export default function DashboardPage() {
   const [payslips, setPayslips] = useState<Payslip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
     try {
       const [
         emps,
@@ -76,14 +76,15 @@ export default function DashboardPage() {
     } catch (e) {
       console.error("Error loading dashboard server data:", e);
     } finally {
-      setIsLoading(false);
+      if (isInitial) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    window.addEventListener("coralgenz_store_updated", loadData);
-    return () => window.removeEventListener("coralgenz_store_updated", loadData);
+    loadData(true);
+    const handleStoreUpdate = () => loadData(false);
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
   }, []);
 
   const currentEmployee = employees.find(

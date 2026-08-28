@@ -34,8 +34,8 @@ export default function PayrollPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = async () => {
-    setIsLoading(true);
+  const loadData = async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
     try {
       const [runs, emps] = await Promise.all([
         PayrollService.getPayrollRuns(),
@@ -46,14 +46,15 @@ export default function PayrollPage() {
     } catch (e) {
       console.error("Error loading payroll data:", e);
     } finally {
-      setIsLoading(false);
+      if (isInitial) setIsLoading(false);
     }
   };
 
   useEffect(() => {
-    loadData();
-    window.addEventListener("coralgenz_store_updated", loadData);
-    return () => window.removeEventListener("coralgenz_store_updated", loadData);
+    loadData(true);
+    const handleStoreUpdate = () => loadData(false);
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
   }, []);
 
   const latestRun = payrollRuns[0];

@@ -15,14 +15,16 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { success, error: toastError } = useToast();
 
-  const loadData = async () => {
-    setIsLoading(true);
-    // Fetch employees from Firestore
-    const emps = await EmployeeService.getEmployees();
-    setEmployees(emps);
-    setDepartments(MockDataStore.getDepartments());
-    setDesignations(MockDataStore.getDesignations());
-    setIsLoading(false);
+  const loadData = async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
+    try {
+      const emps = await EmployeeService.getEmployees();
+      setEmployees(emps);
+      setDepartments(MockDataStore.getDepartments());
+      setDesignations(MockDataStore.getDesignations());
+    } finally {
+      if (isInitial) setIsLoading(false);
+    }
   };
 
   const handleDeleteEmployee = async (id: string) => {
@@ -30,7 +32,7 @@ export default function EmployeesPage() {
       const res = await EmployeeService.deleteEmployee(id);
       if (res) {
         success("Employee Removed", "Employee has been permanently removed from the database server.");
-        await loadData();
+        await loadData(false);
       }
     } catch (err: any) {
       toastError("Delete Failed", err?.message || "Could not remove employee from server.");
@@ -38,9 +40,10 @@ export default function EmployeesPage() {
   };
 
   useEffect(() => {
-    loadData();
-    window.addEventListener("coralgenz_store_updated", loadData);
-    return () => window.removeEventListener("coralgenz_store_updated", loadData);
+    loadData(true);
+    const handleStoreUpdate = () => loadData(false);
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
   }, []);
 
   return (

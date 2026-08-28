@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AuditLog } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,10 @@ export function AuditLogViewer({ initialLogs }: AuditLogViewerProps) {
   const [logs, setLogs] = useState<AuditLog[]>(initialLogs);
   const [searchQuery, setSearchQuery] = useState("");
   const [moduleFilter, setModuleFilter] = useState("all");
+
+  useEffect(() => {
+    setLogs(initialLogs);
+  }, [initialLogs]);
 
   const filteredLogs = logs.filter((l) => {
     const q = searchQuery.toLowerCase().trim();

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { EmployeeRequest, EmployeeRequestType, RequestStatus, Employee } from "@/types";
 import { RequestService } from "@/lib/firebase/request-service";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -81,13 +81,22 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
   const [reviewingRequest, setReviewingRequest] = useState<EmployeeRequest | null>(null);
   const [reviewerComments, setReviewerComments] = useState("");
 
+  useEffect(() => {
+    setRequests(initialRequests);
+  }, [initialRequests]);
+
   const refreshData = async () => {
     try {
       const list = await RequestService.getRequests();
       setRequests(list);
     } catch {}
-    if (onRefresh) onRefresh();
   };
+
+  useEffect(() => {
+    const handleStoreUpdate = () => refreshData();
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
+  }, []);
 
   const isEmployee = currentRole === "employee";
   const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "payroll_manager" || currentRole === "manager";

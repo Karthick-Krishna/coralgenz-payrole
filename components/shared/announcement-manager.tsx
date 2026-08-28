@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Announcement } from "@/types";
 import { AnnouncementService } from "@/lib/firebase/announcement-service";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -37,13 +37,22 @@ export function AnnouncementManager({ initialAnnouncements, onRefresh }: Announc
   const [priority, setPriority] = useState<Announcement["priority"]>("medium");
   const [isPinned, setIsPinned] = useState(false);
 
+  useEffect(() => {
+    setAnnouncements(initialAnnouncements);
+  }, [initialAnnouncements]);
+
   const refreshData = async () => {
     try {
       const list = await AnnouncementService.getAnnouncements();
       setAnnouncements(list);
     } catch {}
-    if (onRefresh) onRefresh();
   };
+
+  useEffect(() => {
+    const handleStoreUpdate = () => refreshData();
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
+  }, []);
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();

@@ -63,6 +63,11 @@ export function LeaveManager({
   const [daysCount, setDaysCount] = useState(1);
   const [leaveReason, setLeaveReason] = useState("");
 
+  useEffect(() => {
+    setRequests(initialLeaveRequests);
+    setBalances(initialBalances);
+  }, [initialLeaveRequests, initialBalances]);
+
   const refreshData = async () => {
     try {
       const data = await LeaveService.getLeaves();
@@ -71,13 +76,12 @@ export function LeaveManager({
     } catch (err) {
       console.error("Failed to refresh leave data", err);
     }
-    if (onRefresh) onRefresh();
   };
 
   useEffect(() => {
-    refreshData();
-    window.addEventListener("coralgenz_store_updated", refreshData);
-    return () => window.removeEventListener("coralgenz_store_updated", refreshData);
+    const handleStoreUpdate = () => refreshData();
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
   }, []);
 
   // Compute days count when dates change
