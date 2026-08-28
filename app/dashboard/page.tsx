@@ -4,6 +4,11 @@ import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
 import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
+import { PayrollService } from "@/lib/firebase/payroll-service";
+import { AttendanceService } from "@/lib/firebase/attendance-service";
+import { LeaveService } from "@/lib/firebase/leave-service";
+import { AnnouncementService } from "@/lib/firebase/announcement-service";
+import { AuditService } from "@/lib/firebase/audit-service";
 import { AppLayout } from "@/components/layout/app-layout";
 import { SuperAdminDashboard } from "@/components/dashboard/super-admin-dashboard";
 import { HRDashboard } from "@/components/dashboard/hr-dashboard";
@@ -35,19 +40,44 @@ export default function DashboardPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
   const [payslips, setPayslips] = useState<Payslip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
-    const emps = await EmployeeService.getEmployees();
-    setEmployees(emps);
-    setPayrollRuns(MockDataStore.getPayrollRuns());
-    setAttendance(MockDataStore.getAttendance());
-    setLeaveRequests(MockDataStore.getLeaveRequests());
-    setAuditLogs(MockDataStore.getAuditLogs());
-    setDepartments(MockDataStore.getDepartments());
-    setHolidays(MockDataStore.getHolidays());
-    setAnnouncements(MockDataStore.getAnnouncements());
-    setLeaveBalances(MockDataStore.getLeaveBalances());
-    setPayslips(MockDataStore.getPayslips());
+    setIsLoading(true);
+    try {
+      const [
+        emps,
+        runs,
+        att,
+        leaves,
+        annList,
+        psList,
+        logs,
+      ] = await Promise.all([
+        EmployeeService.getEmployees(),
+        PayrollService.getPayrollRuns(),
+        AttendanceService.getAttendance(),
+        LeaveService.getLeaves(),
+        AnnouncementService.getAnnouncements(),
+        PayrollService.getPayslips(),
+        AuditService.getLogs(),
+      ]);
+
+      setEmployees(emps);
+      setPayrollRuns(runs);
+      setAttendance(att);
+      setLeaveRequests(leaves.requests);
+      if (leaves.balance) setLeaveBalances([leaves.balance]);
+      setAnnouncements(annList);
+      setPayslips(psList);
+      setAuditLogs(logs as any[]);
+      setDepartments(MockDataStore.getDepartments());
+      setHolidays(MockDataStore.getHolidays());
+    } catch (e) {
+      console.error("Error loading dashboard server data:", e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -58,64 +88,72 @@ export default function DashboardPage() {
 
   const currentEmployee = employees.find(
     (e) => (user?.employeeId && e.id === user.employeeId) || (user?.email && e.email?.toLowerCase() === user.email?.toLowerCase())
-  ) || employees.find((e) => e.id === "CGG-EMP-0002") || employees[0];
-
-  const currentEmpId = currentEmployee?.id || user?.employeeId || "CGG-EMP-0002";
-  const currentBalance = leaveBalances.find((b) => b.employeeId === currentEmpId);
-  const myPayslip = payslips.find((p) => p.employeeId === currentEmpId);
-  const myLeaveRequests = leaveRequests.filter(
-    (lr) => lr.employeeId === currentEmpId || (user?.displayName && lr.employeeName === user.displayName)
   );
-  const teamEmployees = employees.filter((e) => e.managerId === currentEmpId);
 
   return (
     <AppLayout module="dashboard">
-      {currentRole === "super_admin" && (
-        <SuperAdminDashboard
-          employees={employees}
-          payrollRuns={payrollRuns}
-          attendance={attendance}
-          leaveRequests={leaveRequests}
-          auditLogs={auditLogs}
-          departments={departments}
-        />
-      )}
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
+        </div>
+      ) : (
+        <>
+          {currentRole === "super_admin" && (
+            <SuperAdminDashboard
+              employees={employees}
+              payrollRuns={payrollRuns}
+              attendance={attendance}
+              leaveRequests={leaveRequests}
+              auditLogs={auditLogs}
+              departments={departments}
+            />
+          )}
 
-      {currentRole === "hr_admin" && (
-        <HRDashboard
-          employees={employees}
-          leaveRequests={leaveRequests}
-          attendance={attendance}
-          departments={departments}
-          holidays={holidays}
-        />
-      )}
+          {currentRole === "hr_admin" && (
+            <HRDashboard
+              employees={employees}
+              attendance={attendance}
+              leaveRequests={leaveRequests}
+              departments={departments}
+              holidays={holidays}
+            />
+          )}
 
-      {currentRole === "payroll_manager" && (
-        <PayrollDashboard
-          payrollRuns={payrollRuns}
-          employees={employees}
-        />
-      )}
+          {currentRole === "payroll_manager" && (
+            <PayrollDashboard
+              employees={employees}
+              payrollRuns={payrollRuns}
+            />
+          )}
 
-      {currentRole === "manager" && (
-        <ManagerDashboard
-          managerEmployee={currentEmployee}
-          teamEmployees={teamEmployees.length > 0 ? teamEmployees : employees.slice(0, 4)}
-          teamLeaveRequests={leaveRequests}
-          attendance={attendance}
-        />
-      )}
+          {currentRole === "manager" && (
+            <ManagerDashboard
+              managerEmployee={currentEmployee}
+              teamEmployees={employees.filter((e) => e.managerId === currentEmployee?.id || !e.managerId)}
+              teamLeaveRequests={leaveRequests}
+              attendance={attendance}
+            />
+          )}
 
-      {currentRole === "employee" && (
-        <EmployeeDashboard
-          employee={currentEmployee}
-          leaveBalance={currentBalance}
-          leaveRequests={myLeaveRequests}
-          latestPayslip={myPayslip}
-          announcements={announcements}
-          holidays={holidays}
-        />
+          {currentRole === "employee" && (
+            <EmployeeDashboard
+              employee={currentEmployee}
+              leaveRequests={leaveRequests.filter(
+                (l) => l.employeeId === (user?.employeeId || currentEmployee?.id)
+              )}
+              leaveBalance={
+                leaveBalances.find((b) => b.employeeId === (user?.employeeId || currentEmployee?.id)) ||
+                leaveBalances[0]
+              }
+              latestPayslip={
+                payslips.find((p) => p.employeeId === (user?.employeeId || currentEmployee?.id)) ||
+                payslips[0]
+              }
+              announcements={announcements}
+              holidays={holidays}
+            />
+          )}
+        </>
       )}
     </AppLayout>
   );

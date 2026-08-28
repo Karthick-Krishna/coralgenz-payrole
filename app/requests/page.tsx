@@ -3,16 +3,29 @@
 import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { RequestManager } from "@/components/requests/request-manager";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { RequestService } from "@/lib/firebase/request-service";
+import { EmployeeService } from "@/lib/firebase/employee-service";
 import { EmployeeRequest, Employee } from "@/types";
 
 export default function RequestsPage() {
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = () => {
-    setRequests(MockDataStore.getRequests());
-    setEmployees(MockDataStore.getEmployees());
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [reqList, emps] = await Promise.all([
+        RequestService.getRequests(),
+        EmployeeService.getEmployees(),
+      ]);
+      setRequests(reqList);
+      setEmployees(emps);
+    } catch (e) {
+      console.error("Error loading requests:", e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -23,10 +36,17 @@ export default function RequestsPage() {
 
   return (
     <AppLayout module="requests">
-      <RequestManager
-        initialRequests={requests}
-        employees={employees}
-      />
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
+        </div>
+      ) : (
+        <RequestManager
+          initialRequests={requests}
+          employees={employees}
+          onRefresh={loadData}
+        />
+      )}
     </AppLayout>
   );
 }

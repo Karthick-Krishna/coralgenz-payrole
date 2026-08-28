@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { EmployeeRequest, EmployeeRequestType, RequestStatus, Employee } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { RequestService } from "@/lib/firebase/request-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -44,9 +44,10 @@ import {
 interface RequestManagerProps {
   initialRequests: EmployeeRequest[];
   employees: Employee[];
+  onRefresh?: () => void;
 }
 
-export function RequestManager({ initialRequests, employees }: RequestManagerProps) {
+export function RequestManager({ initialRequests, employees, onRefresh }: RequestManagerProps) {
   const { user, currentRole } = useAuth();
   const { success, error } = useToast();
 
@@ -69,7 +70,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
   const [repaymentMonths, setRepaymentMonths] = useState(3);
   const [letterType, setLetterType] = useState<"salary_certificate" | "bonafide" | "experience" | "relieving" | "address_proof">("salary_certificate");
   const [purpose, setPurpose] = useState("");
-  const [regDate, setRegDate] = useState("2026-08-26");
+  const [regDate, setRegDate] = useState(new Date().toISOString().split("T")[0]);
   const [regCheckIn, setRegCheckIn] = useState("09:00:00");
   const [regCheckOut, setRegCheckOut] = useState("18:00:00");
   const [section80C, setSection80C] = useState(150000);
@@ -80,8 +81,12 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
   const [reviewingRequest, setReviewingRequest] = useState<EmployeeRequest | null>(null);
   const [reviewerComments, setReviewerComments] = useState("");
 
-  const refreshData = () => {
-    setRequests(MockDataStore.getRequests());
+  const refreshData = async () => {
+    try {
+      const list = await RequestService.getRequests();
+      setRequests(list);
+    } catch {}
+    if (onRefresh) onRefresh();
   };
 
   const isEmployee = currentRole === "employee";
@@ -91,7 +96,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
   const myEmployeeId =
     user?.employeeId ||
     employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
-    "CGG-EMP-0002";
+    "CGG-EMP-0001";
   const filteredRequests = requests.filter((req) => {
     if (isEmployee || activeTab === "my_requests") {
       if (req.employeeId !== myEmployeeId && req.employeeName !== user?.displayName) return false;
@@ -121,7 +126,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
     setShowCreateModal(true);
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !description) {
       error("Missing Information", "Please enter a title and description for your request.");
@@ -154,7 +159,7 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
       payload.hraAnnualRent = hraRent * 12;
     }
 
-    MockDataStore.createRequest({
+    await RequestService.submitRequest({
       organizationId: "org-coralgenz-01",
       employeeId: currentEmp.id,
       employeeName: `${currentEmp.firstName} ${currentEmp.lastName}`,
@@ -173,16 +178,17 @@ export function RequestManager({ initialRequests, employees }: RequestManagerPro
     refreshData();
   };
 
-  const handleReviewAction = (status: RequestStatus) => {
+  const handleReviewAction = async (status: RequestStatus) => {
     if (!reviewingRequest) return;
 
-    MockDataStore.updateRequestStatus(
-      reviewingRequest.id,
+    await RequestService.submitRequest({
+      ...reviewingRequest,
       status,
-      user?.displayName || "Reviewer",
-      user?.id || "usr-01",
-      reviewerComments
-    );
+      reviewerComments,
+      reviewerName: user?.displayName || "Reviewer",
+      reviewerId: user?.id || "usr-01",
+      reviewedAt: new Date().toISOString(),
+    });
 
     success(
       `Request ${status === "approved" ? "Approved" : status === "rejected" ? "Rejected" : "Updated"}`,

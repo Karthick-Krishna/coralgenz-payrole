@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { PayrollService } from "@/lib/firebase/payroll-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Employee, PayrollRun, PayrollItem, Payslip } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -69,50 +69,63 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
   };
 
   // Step 2 -> 3: Compute Payroll Run
-  const handleComputePayroll = () => {
+  const handleComputePayroll = async () => {
     setIsProcessing(true);
-    setTimeout(() => {
-      const { run, items } = MockDataStore.createPayrollRun(
-        selectedMonth,
-        selectedYear,
+    try {
+      const res = await PayrollService.processPayrollRun({
+        month: selectedMonth,
+        year: selectedYear,
         periodName,
-        `${selectedYear}-08-01`,
-        `${selectedYear}-08-31`,
-        payDate
-      );
-      setGeneratedRun(run);
-      setPayrollItems(items);
+        startDate: `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`,
+        endDate: `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-28`,
+        paymentDate: payDate,
+        processedBy: user?.id || "usr-superadmin-01",
+        processedByName: user?.displayName || "Super Admin",
+      });
+
+      if (res.success && res.run && res.items) {
+        setGeneratedRun(res.run);
+        setPayrollItems(res.items);
+        setStep(3);
+      } else {
+        error("Process Error", res.error || "Failed to calculate payroll.");
+      }
+    } catch (err: any) {
+      error("Process Error", err.message || "Failed to calculate payroll.");
+    } finally {
       setIsProcessing(false);
-      setStep(3);
-    }, 400);
+    }
   };
 
   // Step 4 -> 5: Lock Payroll & Generate Payslips
-  const handleLockAndGenerate = () => {
+  const handleLockAndGenerate = async () => {
     if (!generatedRun) return;
     setIsProcessing(true);
-    setTimeout(() => {
-      const result = MockDataStore.approveAndLockPayrollRun(
-        generatedRun.id,
-        user?.id || "usr-payroll-01",
-        user?.displayName || "Thanvanth H"
-      );
+    try {
+      const res = await PayrollService.lockAndPublishPayroll({
+        runId: generatedRun.id,
+        approvedBy: user?.id || "usr-superadmin-01",
+        approvedByName: user?.displayName || "Super Admin",
+      });
 
-      if (result) {
-        setGeneratedRun(result.run);
-        setGeneratedPayslips(result.payslips);
+      if (res.success && res.run && res.payslips) {
+        setGeneratedRun(res.run);
+        setGeneratedPayslips(res.payslips);
         confetti({
           particleCount: 100,
           spread: 70,
           origin: { y: 0.6 },
         });
-        success("Payroll Locked & Payslips Published", `Successfully generated ${result.payslips.length} employee payslips.`);
+        success("Payroll Locked & Payslips Published", `Successfully generated ${res.payslips.length} employee payslips on the server.`);
         setStep(5);
       } else {
-        error("Lock Failed", "Could not lock payroll run.");
+        error("Lock Failed", res.error || "Could not lock payroll run.");
       }
+    } catch (err: any) {
+      error("Lock Failed", err.message || "Could not lock payroll run.");
+    } finally {
       setIsProcessing(false);
-    }, 500);
+    }
   };
 
   const handleExportBankTransfer = () => {

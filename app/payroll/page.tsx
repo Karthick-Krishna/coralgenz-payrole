@@ -3,7 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { PayrollService } from "@/lib/firebase/payroll-service";
+import { EmployeeService } from "@/lib/firebase/employee-service";
 import { PayrollRun, Employee } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -31,10 +32,22 @@ export default function PayrollPage() {
   const router = useRouter();
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = () => {
-    setPayrollRuns(MockDataStore.getPayrollRuns());
-    setEmployees(MockDataStore.getEmployees());
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const [runs, emps] = await Promise.all([
+        PayrollService.getPayrollRuns(),
+        EmployeeService.getEmployees(),
+      ]);
+      setPayrollRuns(runs);
+      setEmployees(emps);
+    } catch (e) {
+      console.error("Error loading payroll data:", e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {

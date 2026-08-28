@@ -3,14 +3,23 @@
 import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { AuditLogViewer } from "@/components/shared/audit-log-viewer";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { AuditService } from "@/lib/firebase/audit-service";
 import { AuditLog } from "@/types";
 
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = () => {
-    setLogs(MockDataStore.getAuditLogs());
+  const loadData = async () => {
+    setIsLoading(true);
+    try {
+      const list = await AuditService.getLogs();
+      setLogs(list as any[]);
+    } catch (e) {
+      console.error("Error loading audit logs:", e);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -21,7 +30,13 @@ export default function AuditLogsPage() {
 
   return (
     <AppLayout module="audit_logs">
-      <AuditLogViewer initialLogs={logs} />
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
+        </div>
+      ) : (
+        <AuditLogViewer initialLogs={logs} />
+      )}
     </AppLayout>
   );
 }

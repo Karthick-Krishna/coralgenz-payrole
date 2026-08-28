@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { LeaveRequest, LeaveBalance, Employee } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { LeaveService } from "@/lib/firebase/leave-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -37,12 +37,14 @@ interface LeaveManagerProps {
   initialLeaveRequests: LeaveRequest[];
   initialBalances: LeaveBalance[];
   employees: Employee[];
+  onRefresh?: () => void;
 }
 
 export function LeaveManager({
   initialLeaveRequests,
   initialBalances,
   employees,
+  onRefresh,
 }: LeaveManagerProps) {
   const { user, currentRole } = useAuth();
   const { success, error } = useToast();
@@ -53,7 +55,7 @@ export function LeaveManager({
   // Apply Leave Modal State
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState(
-    user?.employeeId || employees[0]?.id || "CGG-EMP-0002"
+    user?.employeeId || employees[0]?.id || "CGG-EMP-0001"
   );
   const [leaveType, setLeaveType] = useState<LeaveRequest["leaveType"]>("casual");
   const [startDate, setStartDate] = useState(new Date().toISOString().split("T")[0]);
@@ -61,9 +63,15 @@ export function LeaveManager({
   const [daysCount, setDaysCount] = useState(1);
   const [leaveReason, setLeaveReason] = useState("");
 
-  const refreshData = () => {
-    setRequests(MockDataStore.getLeaveRequests());
-    setBalances(MockDataStore.getLeaveBalances());
+  const refreshData = async () => {
+    try {
+      const data = await LeaveService.getLeaves();
+      setRequests(data.requests);
+      if (data.balance) setBalances([data.balance]);
+    } catch (err) {
+      console.error("Failed to refresh leave data", err);
+    }
+    if (onRefresh) onRefresh();
   };
 
   useEffect(() => {
@@ -88,11 +96,11 @@ export function LeaveManager({
   const myEmpId =
     user?.employeeId ||
     employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
-    "CGG-EMP-0002";
+    "CGG-EMP-0001";
   const isEmployee = currentRole === "employee";
   const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "manager";
 
-  const handleApplyLeave = (e: React.FormEvent) => {
+  const handleApplyLeave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!leaveReason.trim()) {
       error("Reason Required", "Please provide a reason for the leave application.");
@@ -103,9 +111,9 @@ export function LeaveManager({
     const emp =
       employees.find((e) => e.id === targetEmpId) ||
       employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase()) ||
-      employees[0];
+      employees[0] || ({ id: targetEmpId, firstName: "Employee", lastName: "", departmentName: "General" });
 
-    MockDataStore.submitLeaveRequest({
+    await LeaveService.submitLeaveRequest({
       organizationId: "org-coralgenz-01",
       employeeId: emp.id,
       employeeName: `${emp.firstName} ${emp.lastName}`,
@@ -124,24 +132,20 @@ export function LeaveManager({
     refreshData();
   };
 
-  const handleApprove = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(
+  const handleApprove = async (reqId: string) => {
+    await LeaveService.updateLeaveStatus(
       reqId,
       "approved",
-      user?.id || "usr-hr-01",
-      user?.displayName || "HR Admin",
       "Approved by HR/Manager"
     );
     success("Leave Approved", "The employee's leave balance has been updated.");
     refreshData();
   };
 
-  const handleReject = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(
+  const handleReject = async (reqId: string) => {
+    await LeaveService.updateLeaveStatus(
       reqId,
       "rejected",
-      user?.id || "usr-hr-01",
-      user?.displayName || "HR Admin",
       "Rejected per company policy"
     );
     success("Leave Rejected", "The request status was updated.");

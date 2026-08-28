@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { AttendanceService } from "@/lib/firebase/attendance-service";
+import { useAuth } from "@/lib/auth/auth-context";
 import { AttendanceRecord, Employee, Department } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -19,17 +20,20 @@ import {
 } from "@/components/ui/table";
 import { formatTime, formatDate } from "@/lib/utils";
 import { exportToCSV } from "@/lib/export/export-utils";
-import { useAuth } from "@/lib/auth/auth-context";
 import { useToast } from "@/components/ui/toast";
 import {
   Clock,
   Calendar,
   CheckCircle2,
+  XCircle,
   AlertTriangle,
   Download,
   Filter,
+  Fingerprint,
   Edit2,
-  Plus,
+  Edit3,
+  Sparkles,
+  MapPin,
   Building,
 } from "lucide-react";
 
@@ -37,18 +41,20 @@ interface AttendanceTrackerProps {
   initialAttendance: AttendanceRecord[];
   employees: Employee[];
   departments: Department[];
+  onRefresh?: () => void;
 }
 
 export function AttendanceTracker({
   initialAttendance,
   employees,
   departments,
+  onRefresh,
 }: AttendanceTrackerProps) {
   const { currentRole, user } = useAuth();
   const { success, error } = useToast();
   const canEditAttendance = currentRole === "super_admin" || currentRole === "hr_admin";
   const [attendance, setAttendance] = useState<AttendanceRecord[]>(initialAttendance);
-  const [selectedDate, setSelectedDate] = useState("2026-08-26");
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0]);
   const [selectedDept, setSelectedDept] = useState("all");
   const [selectedStatus, setSelectedStatus] = useState("all");
 
@@ -59,9 +65,12 @@ export function AttendanceTracker({
   const [editStatus, setEditStatus] = useState<AttendanceRecord["status"]>("present");
   const [overrideReason, setOverrideReason] = useState("Biometric device sync correction");
 
-  const refreshData = () => {
-    const list = MockDataStore.getAttendance();
-    setAttendance(list);
+  const refreshData = async () => {
+    try {
+      const list = await AttendanceService.getAttendance();
+      setAttendance(list);
+    } catch {}
+    if (onRefresh) onRefresh();
   };
 
   useEffect(() => {
@@ -73,7 +82,7 @@ export function AttendanceTracker({
   const myEmpId =
     user?.employeeId ||
     employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
-    "CGG-EMP-0002";
+    "CGG-EMP-0001";
   const isEmployee = currentRole === "employee";
 
   const filteredAttendance = attendance.filter((a) => {
@@ -98,20 +107,18 @@ export function AttendanceTracker({
     setOverrideReason("Biometric punch correction requested");
   };
 
-  const handleSaveEdit = (e: React.FormEvent) => {
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingRecord) return;
 
-    MockDataStore.manualUpdateAttendance(
-      editingRecord.id,
-      {
-        checkIn: editCheckIn,
-        checkOut: editCheckOut,
-        status: editStatus,
-      },
-      "HR Administrator",
-      overrideReason
-    );
+    await AttendanceService.logAttendance({
+      ...editingRecord,
+      checkIn: editCheckIn,
+      checkOut: editCheckOut,
+      status: editStatus,
+      manualOverrideReason: overrideReason,
+      manualOverrideBy: user?.displayName || "HR Administrator",
+    });
 
     success("Attendance Corrected", `Updated attendance record for ${editingRecord.employeeName}`);
     setEditingRecord(null);

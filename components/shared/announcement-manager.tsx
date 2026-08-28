@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { Announcement } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { AnnouncementService } from "@/lib/firebase/announcement-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,9 +22,10 @@ import {
 
 interface AnnouncementManagerProps {
   initialAnnouncements: Announcement[];
+  onRefresh?: () => void;
 }
 
-export function AnnouncementManager({ initialAnnouncements }: AnnouncementManagerProps) {
+export function AnnouncementManager({ initialAnnouncements, onRefresh }: AnnouncementManagerProps) {
   const { user, currentRole } = useAuth();
   const { success, error } = useToast();
   const [announcements, setAnnouncements] = useState<Announcement[]>(initialAnnouncements);
@@ -36,18 +37,22 @@ export function AnnouncementManager({ initialAnnouncements }: AnnouncementManage
   const [priority, setPriority] = useState<Announcement["priority"]>("medium");
   const [isPinned, setIsPinned] = useState(false);
 
-  const refreshData = () => {
-    setAnnouncements(MockDataStore.getAnnouncements());
+  const refreshData = async () => {
+    try {
+      const list = await AnnouncementService.getAnnouncements();
+      setAnnouncements(list);
+    } catch {}
+    if (onRefresh) onRefresh();
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title || !content) {
       error("Missing Information", "Please provide announcement title and content.");
       return;
     }
 
-    MockDataStore.addAnnouncement({
+    await AnnouncementService.addAnnouncement({
       organizationId: "org-coralgenz-01",
       title,
       content,
