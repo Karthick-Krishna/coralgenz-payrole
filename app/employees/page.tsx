@@ -29,11 +29,11 @@ export default function EmployeesPage() {
     try {
       const res = await EmployeeService.deleteEmployee(id);
       if (res) {
-        success("Employee Deactivated", "Employee status has been updated to inactive in the database.");
+        success("Employee Removed", "Employee has been permanently removed from the database server.");
         await loadData();
       }
     } catch (err: any) {
-      toastError("Delete Failed", err?.message || "Could not deactivate employee.");
+      toastError("Delete Failed", err?.message || "Could not remove employee from server.");
     }
   };
 

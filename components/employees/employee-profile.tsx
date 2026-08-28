@@ -47,6 +47,7 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  AlertTriangle,
 } from "lucide-react";
 import { AuthService } from "@/lib/firebase/auth-service";
 
@@ -85,6 +86,24 @@ export function EmployeeProfile({
   const [showDocModal, setShowDocModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  const handleDeleteEmployee = async () => {
+    setIsDeleting(true);
+    try {
+      const res = await EmployeeService.deleteEmployee(employee.id);
+      if (res) {
+        success("Employee Removed", `Successfully removed ${employee.firstName} ${employee.lastName} from the database server.`);
+        router.push("/employees");
+      }
+    } catch (err: any) {
+      error("Delete Failed", err.message || "Failed to remove employee from server.");
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
+  };
 
   // Photo state
   const [selectedPhotoUrl, setSelectedPhotoUrl] = useState(employee.avatarUrl || "");
@@ -401,6 +420,15 @@ export function EmployeeProfile({
                 className="text-xs"
               >
                 Offboard
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowDeleteModal(true)}
+                leftIcon={<Trash2 className="w-3.5 h-3.5 text-rose-600" />}
+                className="text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-800"
+              >
+                Remove
               </Button>
               <Button
                 variant="coral"
@@ -1109,6 +1137,55 @@ export function EmployeeProfile({
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL 6: PERMANENT EMPLOYEE DELETION */}
+      <Modal
+        isOpen={showDeleteModal}
+        onClose={() => setShowDeleteModal(false)}
+        title="Remove Employee from Database Server"
+        description="Permanently delete this employee profile and associated authentication credentials."
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm mb-1">Permanent Data Deletion</p>
+              <p>
+                You are about to permanently remove <strong>{employee.firstName} {employee.lastName}</strong> ({employee.id}) from the database server.
+                This action will delete their employee record, authentication user, leave balance, and credentials from Google Cloud Firestore.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+            <p><span className="text-slate-400">Employee ID:</span> <span className="font-mono font-bold">{employee.id}</span></p>
+            <p><span className="text-slate-400">Official Email:</span> <span className="font-medium">{employee.email}</span></p>
+            <p><span className="text-slate-400">Designation:</span> <span className="font-medium">{employee.designationTitle}</span></p>
+            <p><span className="text-slate-400">Department:</span> <span className="font-medium">{employee.departmentName}</span></p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeleteModal(false)}
+              disabled={isDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleDeleteEmployee}
+              isLoading={isDeleting}
+              leftIcon={<Trash2 className="w-4 h-4" />}
+            >
+              Confirm Permanent Removal
+            </Button>
+          </div>
+        </div>
       </Modal>
     </div>
   );

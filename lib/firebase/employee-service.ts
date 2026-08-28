@@ -186,7 +186,7 @@ export class EmployeeService {
   }
 
   /**
-   * Deactivate/Soft-delete an employee
+   * Permanently delete an employee from server
    */
   public static async deleteEmployee(id: string): Promise<boolean> {
     if (!id) return false;
@@ -204,11 +204,8 @@ export class EmployeeService {
     // 2. Client Firestore fallback
     if (isFirebaseConfigured && db) {
       try {
-        const docRef = doc(db, this.collectionName, id);
-        await updateDoc(docRef, {
-          status: 'inactive',
-          updatedAt: new Date().toISOString(),
-        });
+        const { deleteDoc } = await import('firebase/firestore');
+        await deleteDoc(doc(db, this.collectionName, id));
         return true;
       } catch {}
     }
