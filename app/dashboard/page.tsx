@@ -45,34 +45,53 @@ export default function DashboardPage() {
   const loadData = async (isInitial = false) => {
     if (isInitial) setIsLoading(true);
     try {
-      const [
-        emps,
-        runs,
-        att,
-        leaves,
-        annList,
-        psList,
-        logs,
-      ] = await Promise.all([
-        EmployeeService.getEmployees(),
-        PayrollService.getPayrollRuns(),
-        AttendanceService.getAttendance(),
-        LeaveService.getLeaves(),
-        AnnouncementService.getAnnouncements(),
-        PayrollService.getPayslips(),
-        AuditService.getLogs(),
-      ]);
+      if (currentRole === "employee") {
+        const empId = user?.employeeId || "CGG-EMP-0002";
+        const [emp, leaves, annList, psList, att] = await Promise.all([
+          EmployeeService.getEmployeeById(empId),
+          LeaveService.getLeaves(empId),
+          AnnouncementService.getAnnouncements(),
+          PayrollService.getPayslips(),
+          AttendanceService.getAttendance(empId)
+        ]);
+        
+        if (emp) setEmployees([emp]);
+        setLeaveRequests(leaves.requests);
+        if (leaves.balance) setLeaveBalances([leaves.balance]);
+        setAnnouncements(annList);
+        setPayslips(psList.filter(p => p.employeeId === empId));
+        setHolidays(MockDataStore.getHolidays());
+        setAttendance(att);
+      } else {
+        const [
+          emps,
+          runs,
+          att,
+          leaves,
+          annList,
+          psList,
+          logs,
+        ] = await Promise.all([
+          EmployeeService.getEmployees(),
+          PayrollService.getPayrollRuns(),
+          AttendanceService.getAttendance(),
+          LeaveService.getLeaves(),
+          AnnouncementService.getAnnouncements(),
+          PayrollService.getPayslips(),
+          AuditService.getLogs(),
+        ]);
 
-      setEmployees(emps);
-      setPayrollRuns(runs);
-      setAttendance(att);
-      setLeaveRequests(leaves.requests);
-      if (leaves.balance) setLeaveBalances([leaves.balance]);
-      setAnnouncements(annList);
-      setPayslips(psList);
-      setAuditLogs(logs as any[]);
-      setDepartments(MockDataStore.getDepartments());
-      setHolidays(MockDataStore.getHolidays());
+        setEmployees(emps);
+        setPayrollRuns(runs);
+        setAttendance(att);
+        setLeaveRequests(leaves.requests);
+        if (leaves.balance) setLeaveBalances([leaves.balance]);
+        setAnnouncements(annList);
+        setPayslips(psList);
+        setAuditLogs(logs as any[]);
+        setDepartments(MockDataStore.getDepartments());
+        setHolidays(MockDataStore.getHolidays());
+      }
     } catch (e) {
       console.error("Error loading dashboard server data:", e);
     } finally {

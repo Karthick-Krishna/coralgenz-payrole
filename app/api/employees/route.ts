@@ -90,14 +90,11 @@ export async function POST(request: Request) {
     const cleanEmail = employeeData.email.toLowerCase().trim();
     const cleanPassword = (portalPassword || 'Welcome@2026').trim();
 
-    // Security check: Only Super Admin can assign elevated system roles.
-    const isSuperAdminCreator = 
-      creatorRole === 'super_admin' || 
-      createdBy?.toLowerCase() === 'super admin' || 
-      createdBy?.toLowerCase() === 'karthick krishna' || 
-      createdBy?.toLowerCase() === 'karthick@coralgenz.co.in';
-
-    const effectiveRole: UserRole = isSuperAdminCreator ? (portalRole || 'employee') : 'employee';
+    // Only Super Admin can *explicitly* delegate roles. But if they are an admin, 
+    // we should trust the portalRole that the client-side form inferred from the designation!
+    // Since employee-form.tsx only allows Super Admins to manually override the portalRole, 
+    // non-super-admins will send the `portalRole` they derived from the designation.
+    const effectiveRole: UserRole = portalRole || 'employee';
 
     // 1. Calculate next sequential Employee ID
     let currentCount = serverEmployeeCache.size;

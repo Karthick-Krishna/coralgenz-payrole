@@ -7,6 +7,7 @@ import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Employee, Department, Designation } from "@/types";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/lib/auth/auth-context";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -15,7 +16,10 @@ export default function EmployeesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const { success, error: toastError } = useToast();
 
+  const { currentRole } = useAuth();
+  
   const loadData = async (isInitial = false) => {
+    if (currentRole === "employee") return; // Unauthorized
     if (isInitial) setIsLoading(true);
     try {
       const emps = await EmployeeService.getEmployees();

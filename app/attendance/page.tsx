@@ -8,21 +8,34 @@ import { EmployeeService } from "@/lib/firebase/employee-service";
 import { MockDataStore } from "@/lib/store/mock-store";
 import { AttendanceRecord, Employee, Department } from "@/types";
 
+import { useAuth } from "@/lib/auth/auth-context";
+
 export default function AttendancePage() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const { currentRole, user } = useAuth();
 
   const loadData = async (isInitial = false) => {
     if (isInitial) setIsLoading(true);
     try {
-      const [att, emps] = await Promise.all([
-        AttendanceService.getAttendance(),
-        EmployeeService.getEmployees(),
-      ]);
-      setAttendance(att);
-      setEmployees(emps);
+      const empId = user?.employeeId || "";
+      if (currentRole === "employee") {
+        const [att, emp] = await Promise.all([
+          AttendanceService.getAttendance(empId),
+          EmployeeService.getEmployeeById(empId),
+        ]);
+        setAttendance(att);
+        if (emp) setEmployees([emp]);
+      } else {
+        const [att, emps] = await Promise.all([
+          AttendanceService.getAttendance(),
+          EmployeeService.getEmployees(),
+        ]);
+        setAttendance(att);
+        setEmployees(emps);
+      }
       setDepartments(MockDataStore.getDepartments());
     } catch (e) {
       console.error("Error loading attendance:", e);

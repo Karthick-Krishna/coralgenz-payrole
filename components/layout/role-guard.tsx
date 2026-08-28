@@ -24,7 +24,7 @@ export function RoleGuard({
   module,
   redirectToUnauthorized = false,
 }: RoleGuardProps) {
-  const { currentRole, isLoading } = useAuth();
+  const { currentRole, isLoading, user } = useAuth();
   const router = useRouter();
 
   const isPermitted = (): boolean => {
@@ -48,12 +48,16 @@ export function RoleGuard({
   const permitted = isPermitted();
 
   useEffect(() => {
-    if (!isLoading && !permitted && redirectToUnauthorized) {
-      router.push("/unauthorized");
+    if (!isLoading) {
+      if (!user) {
+        router.push("/login");
+      } else if (!permitted && redirectToUnauthorized) {
+        router.push("/unauthorized");
+      }
     }
-  }, [isLoading, permitted, redirectToUnauthorized, router]);
+  }, [isLoading, permitted, redirectToUnauthorized, router, user]);
 
-  if (isLoading) {
+  if (isLoading || (!user && !isLoading)) {
     return (
       <div className="p-8">
         <DashboardSkeleton />
