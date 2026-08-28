@@ -729,7 +729,7 @@ export class MockDataStore {
     this.logAudit({
       userId: "system",
       userName: "Payroll Manager",
-      userRole: "payroll_manager",
+      userRole: "hr_admin",
       action: "process_payroll",
       module: "payroll",
       recordId: runId,
@@ -798,7 +798,7 @@ export class MockDataStore {
     this.logAudit({
       userId: approverId,
       userName: approverName,
-      userRole: "payroll_manager",
+      userRole: "hr_admin",
       action: "lock_payroll",
       module: "payroll",
       recordId: runId,

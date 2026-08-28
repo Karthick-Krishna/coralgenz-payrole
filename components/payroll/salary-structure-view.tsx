@@ -48,7 +48,7 @@ export function SalaryStructureView({ initialStructure }: SalaryStructureViewPro
       MockDataStore.logAudit({
         userId: "usr-payroll-01",
         userName: "Thanvanth H",
-        userRole: "payroll_manager",
+        userRole: "hr_admin",
         action: "update_settings",
         module: "settings",
         details: "Updated Indian Statutory Salary Structure and Tax rules",

@@ -186,35 +186,8 @@ export async function PUT(
       } catch {}
     }
 
-    // 6. Update Firebase Authentication Password & Display Info
-    if (cleanEmail && adminAuth && typeof adminAuth.getUserByEmail === 'function') {
-      try {
-        let authUser = null;
-        try {
-          authUser = await adminAuth.getUserByEmail(cleanEmail);
-        } catch {}
-
-        if (authUser) {
-          const authUpdates: any = {
-            displayName: cleanDisplayName,
-            photoURL: mergedEmp.avatarUrl || undefined,
-          };
-          if (portalPassword && typeof portalPassword === 'string' && portalPassword.trim().length >= 6) {
-            authUpdates.password = portalPassword.trim();
-          }
-          await adminAuth.updateUser(authUser.uid, authUpdates);
-
-          if (mergedEmp.role) {
-            await adminAuth.setCustomUserClaims(authUser.uid, {
-              role: mergedEmp.role,
-              employeeId: id,
-            });
-          }
-        }
-      } catch (authErr: any) {
-        console.warn('Firebase Auth update warning:', authErr.message);
-      }
-    }
+    // 6. Removed Firebase Authentication Password & Display Info updates
+    // as per user requirements to strictly manage auth via Firebase Console.
 
     // 7. Record Security Audit Log
     const auditPayload = {

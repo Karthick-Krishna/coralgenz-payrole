@@ -38,9 +38,9 @@ export function BottomNav({ onOpenMobileMenu }: BottomNavProps) {
         { label: "Staff", href: "/employees", icon: Users },
         { label: "Attendance", href: "/attendance", icon: Clock },
         {
-          label: currentRole === "payroll_manager" ? "Payroll" : "Requests",
-          href: currentRole === "payroll_manager" ? "/payroll" : "/requests",
-          icon: currentRole === "payroll_manager" ? CreditCard : Receipt,
+          label: "Requests",
+          href: "/requests",
+          icon: Receipt,
         },
       ];
 

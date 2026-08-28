@@ -22,20 +22,13 @@ export async function GET(request: Request) {
     let departmentName = '';
     let designationTitle = '';
 
-    // 1. Super Admin special handling
-    if (email === 'karthick@coralgenz.co.in' || email === 'admin@coralgenz.co.in') {
-      return NextResponse.json({
-        success: true,
-        profile: {
-          role: 'super_admin' as UserRole,
-          employeeId: 'CGG-EMP-0001',
-          displayName: 'Karthick Krishna',
-          email,
-          photoURL: '/logo.png',
-          departmentName: 'Executive Leadership',
-          designationTitle: 'Managing Director & Super Admin',
-        },
-      });
+    // 1. Strict Hardcoded Roles
+    if (email === 'karthick@coralgenz.co.in') {
+      role = 'super_admin';
+    } else if (email === 'thanvanth@coralgenz.co.in') {
+      role = 'hr_admin';
+    } else if (email === 'sharveshwaran.r@coralgenz.co.in') {
+      role = 'manager';
     }
 
     // 2. Query Firestore users collection via Admin SDK
@@ -55,7 +48,6 @@ export async function GET(request: Request) {
           const userSnap = await adminDb.collection('users').where('email', '==', email).get();
           if (!userSnap.empty) {
             const data = userSnap.docs[0].data();
-            role = (data?.role as UserRole) || role;
             employeeId = data?.employeeId || employeeId;
             displayName = data?.displayName || displayName;
             photoURL = data?.photoURL || photoURL;
@@ -78,7 +70,7 @@ export async function GET(request: Request) {
             photoURL = emp.avatarUrl || photoURL;
             departmentName = emp.departmentName || '';
             designationTitle = emp.designationTitle || '';
-            if (emp.role) role = emp.role as UserRole;
+            // role is strict based on email, do not overwrite
           }
         } else if (email) {
           empSnap = await adminDb.collection('employees').where('email', '==', email).get();
@@ -89,7 +81,7 @@ export async function GET(request: Request) {
             photoURL = emp.avatarUrl || photoURL;
             departmentName = emp.departmentName || '';
             designationTitle = emp.designationTitle || '';
-            if (emp.role) role = emp.role as UserRole;
+            // role is strict based on email, do not overwrite
           }
         }
       } catch {}
@@ -104,26 +96,13 @@ export async function GET(request: Request) {
           photoURL = emp.avatarUrl || photoURL;
           departmentName = emp.departmentName || '';
           designationTitle = emp.designationTitle || '';
-          if (emp.role) role = emp.role as UserRole;
+          // role is strict based on email, do not overwrite
           break;
         }
       }
     }
 
-    // 5. Fallback designation-based role derivation if role was still default "employee"
-    if (role === 'employee' && designationTitle) {
-      const dt = designationTitle.toLowerCase();
-      const dn = departmentName.toLowerCase();
-      if (dt.includes('super admin') || dt.includes('director') || dt.includes('founder')) {
-        role = 'super_admin';
-      } else if (dt.includes('hr') || dt.includes('human resource') || dn.includes('human resource') || dn.includes('talent')) {
-        role = 'hr_admin';
-      } else if (dt.includes('payroll') || dt.includes('finance') || dt.includes('accountant') || dn.includes('finance') || dn.includes('payroll')) {
-        role = 'payroll_manager';
-      } else if (dt.includes('manager') || dt.includes('lead') || dt.includes('head') || dt.includes('supervisor')) {
-        role = 'manager';
-      }
-    }
+    // 5. Removed fallback designation-based role derivation. Role is strict.
 
     return NextResponse.json({
       success: true,

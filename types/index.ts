@@ -1,7 +1,6 @@
 export type UserRole =
   | 'super_admin'
   | 'hr_admin'
-  | 'payroll_manager'
   | 'manager'
   | 'employee';
 

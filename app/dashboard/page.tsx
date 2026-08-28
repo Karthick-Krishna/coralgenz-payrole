@@ -139,12 +139,6 @@ export default function DashboardPage() {
             />
           )}
 
-          {currentRole === "payroll_manager" && (
-            <PayrollDashboard
-              employees={employees}
-              payrollRuns={payrollRuns}
-            />
-          )}
 
           {currentRole === "manager" && (
             <ManagerDashboard

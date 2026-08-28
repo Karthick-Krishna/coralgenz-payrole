@@ -50,16 +50,7 @@ const PORTALS: PortalConfig[] = [
     badgeVariant: "info",
     description: "Workforce directory, attendance records, leave approvals, and employee onboarding.",
   },
-  {
-    id: "payroll_manager",
-    title: "Payroll Manager Portal",
-    name: "Finance & Payroll",
-    icon: "📊",
-    badge: "Finance & Payroll",
-    accentColor: "purple",
-    badgeVariant: "purple",
-    description: "Salary calculation, statutory compliance (PF/ESI/TDS), and one-click payslip generation.",
-  },
+
   {
     id: "manager",
     title: "Team Manager Portal",

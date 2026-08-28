@@ -42,63 +42,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Pure Server Profile Resolver directly from Firestore & Server API
   const resolveUserProfile = async (uid: string, email: string) => {
     const cleanEmail = email.toLowerCase().trim();
-    let role: UserRole = "employee";
+    let role: UserRole = "employee"; // Strict default for any other email
     let employeeId = "";
     let displayName = cleanEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     let photoURL: string | undefined = undefined;
 
-    // 1. Super Admin special identity
-    if (cleanEmail === "karthick@coralgenz.co.in" || cleanEmail === "admin@coralgenz.co.in") {
-      return {
-        role: "super_admin" as UserRole,
-        employeeId: "CGG-EMP-0001",
-        displayName: "Karthick Krishna",
-        photoURL: "/logo.png",
-      };
+    // Strict Hardcoded Roles per requirements
+    if (cleanEmail === "karthick@coralgenz.co.in") {
+      role = "super_admin";
+    } else if (cleanEmail === "thanvanth@coralgenz.co.in") {
+      role = "hr_admin";
+    } else if (cleanEmail === "sharveshwaran.r@coralgenz.co.in") {
+      role = "manager";
     }
 
-    // 2. Fetch authoritative profile from server endpoint
+    // Attempt to fetch profile info (like employeeId, displayName) from server API
     try {
       const res = await fetch(`/api/auth/profile?email=${encodeURIComponent(cleanEmail)}&uid=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data.profile) {
-          return {
-            role: data.profile.role as UserRole,
-            employeeId: data.profile.employeeId || "",
-            displayName: data.profile.displayName || displayName,
-            photoURL: data.profile.photoURL || undefined,
-          };
+          employeeId = data.profile.employeeId || employeeId;
+          displayName = data.profile.displayName || displayName;
+          photoURL = data.profile.photoURL || photoURL;
         }
       }
     } catch (e) {
       console.warn("Server profile API notice:", e);
     }
 
-    // 3. Fallback client Firestore checks
-    if (isFirebaseConfigured && db) {
+    // Fallback client Firestore checks for employeeId mapping
+    if (isFirebaseConfigured && db && !employeeId) {
       try {
-        const userDocRef = doc(db, "users", uid);
-        const userDoc = await getDoc(userDocRef);
-
-        if (userDoc.exists()) {
-          const data = userDoc.data();
-          role = (data.role as UserRole) || role;
-          employeeId = data.employeeId || employeeId;
-          displayName = data.displayName || displayName;
-          photoURL = data.photoURL || photoURL;
-        } else {
-          const uQuery = query(collection(db, "users"), where("email", "==", cleanEmail));
-          const uSnap = await getDocs(uQuery);
-          if (!uSnap.empty) {
-            const data = uSnap.docs[0].data();
-            role = (data.role as UserRole) || role;
-            employeeId = data.employeeId || employeeId;
-            displayName = data.displayName || displayName;
-            photoURL = data.photoURL || photoURL;
-          }
-        }
-
         const empQuery = query(collection(db, "employees"), where("email", "==", cleanEmail));
         const empSnap = await getDocs(empQuery);
         if (!empSnap.empty) {
@@ -106,22 +81,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           employeeId = emp.id || employeeId;
           displayName = `${emp.firstName} ${emp.lastName}`;
           photoURL = emp.avatarUrl || photoURL;
-          if (emp.role) {
-            role = emp.role as UserRole;
-          } else {
-            const title = (emp.designationTitle || "").toLowerCase();
-            const dept = (emp.departmentName || "").toLowerCase();
-
-            if (title.includes("super admin") || title.includes("founder") || title.includes("director")) {
-              role = "super_admin";
-            } else if (title.includes("hr") || title.includes("human resource") || dept.includes("human resource")) {
-              role = "hr_admin";
-            } else if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || dept.includes("finance")) {
-              role = "payroll_manager";
-            } else if (title.includes("manager") || title.includes("lead") || title.includes("head") || title.includes("vp")) {
-              role = "manager";
-            }
-          }
         }
       } catch (err: any) {
         console.warn("Error fetching Firestore user profile:", err?.message || err);

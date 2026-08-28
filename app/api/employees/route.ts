@@ -88,13 +88,16 @@ export async function POST(request: Request) {
     }
 
     const cleanEmail = employeeData.email.toLowerCase().trim();
-    const cleanPassword = (portalPassword || 'Welcome@2026').trim();
 
-    // Only Super Admin can *explicitly* delegate roles. But if they are an admin, 
-    // we should trust the portalRole that the client-side form inferred from the designation!
-    // Since employee-form.tsx only allows Super Admins to manually override the portalRole, 
-    // non-super-admins will send the `portalRole` they derived from the designation.
-    const effectiveRole: UserRole = portalRole || 'employee';
+    // Strict Hardcoded Roles based on Email
+    let effectiveRole: UserRole = 'employee';
+    if (cleanEmail === 'karthick@coralgenz.co.in') {
+      effectiveRole = 'super_admin';
+    } else if (cleanEmail === 'thanvanth@coralgenz.co.in') {
+      effectiveRole = 'hr_admin';
+    } else if (cleanEmail === 'sharveshwaran.r@coralgenz.co.in') {
+      effectiveRole = 'manager';
+    }
 
     // 1. Calculate next sequential Employee ID
     let currentCount = serverEmployeeCache.size;
@@ -147,55 +150,9 @@ export async function POST(request: Request) {
       await FirestoreRest.setEmployee(nextId, newEmp);
     } catch {}
 
-    // 3. Provision Real Firebase Authentication User on Google Auth Server
-    let uid = `usr-${nextId.toLowerCase()}`;
-
-    // A. Via Firebase Admin SDK if available
-    if (adminAuth && typeof adminAuth.createUser === 'function') {
-      try {
-        const userRecord = await adminAuth.createUser({
-          email: cleanEmail,
-          password: cleanPassword,
-          displayName: `${newEmp.firstName} ${newEmp.lastName}`,
-          photoURL: newEmp.avatarUrl || undefined,
-        });
-        uid = userRecord.uid;
-        try {
-          await adminAuth.setCustomUserClaims(uid, { role: effectiveRole, employeeId: nextId });
-        } catch {}
-      } catch (authError: any) {
-        if (authError.code === 'auth/email-already-exists' || authError.code === 'auth/email-already-in-use') {
-          try {
-            const existingUser = await adminAuth.getUserByEmail(cleanEmail);
-            uid = existingUser.uid;
-            await adminAuth.updateUser(uid, { password: cleanPassword });
-            await adminAuth.setCustomUserClaims(uid, { role: effectiveRole, employeeId: nextId });
-          } catch {}
-        }
-      }
-    }
-
-    // B. Via Firebase Auth REST API (Works directly on Vercel without service account!)
-    if (uid.startsWith('usr-') && firebaseConfig.apiKey) {
-      try {
-        const restUrl = `https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${firebaseConfig.apiKey}`;
-        const restRes = await fetch(restUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            email: cleanEmail,
-            password: cleanPassword,
-            returnSecureToken: true,
-          }),
-        });
-        const restData = await restRes.json();
-        if (restRes.ok && restData.localId) {
-          uid = restData.localId;
-        }
-      } catch (restErr: any) {
-        console.warn('Firebase Auth REST signup notice:', restErr.message);
-      }
-    }
+    // Firebase Auth Identity Provisioning removed as per user requirements.
+    // Super admin will explicitly create Firebase Auth credentials via Firebase Console.
+    const uid = `usr-${nextId.toLowerCase()}`;
 
     // 4. Save User Profile in Firestore (users collection)
     const userPayload = cleanFirestoreData({

@@ -99,7 +99,7 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
   }, []);
 
   const isEmployee = currentRole === "employee";
-  const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "payroll_manager" || currentRole === "manager";
+  const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "manager";
 
   // Filter requests
   const myEmployeeId =

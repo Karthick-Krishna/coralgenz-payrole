@@ -67,7 +67,6 @@ export function Sidebar({ onCloseMobile }: { onCloseMobile?: () => void }) {
   const roleLabels: Record<UserRole, { label: string; variant: "coral" | "purple" | "info" | "warning" | "success" }> = {
     super_admin: { label: "Super Admin", variant: "coral" },
     hr_admin: { label: "HR Admin", variant: "info" },
-    payroll_manager: { label: "Payroll Mgr", variant: "purple" },
     manager: { label: "Manager", variant: "warning" },
     employee: { label: "Employee", variant: "success" },
   };

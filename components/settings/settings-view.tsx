@@ -329,7 +329,7 @@ export function SettingsView({ initialOrg }: SettingsViewProps) {
                         >
                           <option value="super_admin">👑 Super Administrator</option>
                           <option value="hr_admin">💼 HR Administrator</option>
-                          <option value="payroll_manager">📊 Payroll Manager</option>
+
                           <option value="manager">👔 Team Manager</option>
                           <option value="employee">👩‍💻 Employee</option>
                         </Select>
@@ -460,7 +460,7 @@ export function SettingsView({ initialOrg }: SettingsViewProps) {
                 [
                   { role: "super_admin", label: "Super Admin", color: "coral" },
                   { role: "hr_admin", label: "HR Admin", color: "info" },
-                  { role: "payroll_manager", label: "Payroll Manager", color: "purple" },
+
                   { role: "manager", label: "Team Manager", color: "warning" },
                   { role: "employee", label: "Employee (Self-Service)", color: "success" },
                 ] as const
@@ -529,7 +529,7 @@ export function SettingsView({ initialOrg }: SettingsViewProps) {
           >
             <option value="employee">👩‍💻 Employee (Self-Service)</option>
             <option value="manager">👔 Team Manager</option>
-            <option value="payroll_manager">📊 Payroll Manager</option>
+
             <option value="hr_admin">💼 HR Administrator</option>
             <option value="super_admin">👑 Super Administrator</option>
           </Select>

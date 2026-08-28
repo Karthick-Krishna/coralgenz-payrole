@@ -28,6 +28,7 @@ import {
   Eye,
   EyeOff,
   Lock,
+  ShieldAlert,
 } from "lucide-react";
 
 interface EmployeeFormProps {
@@ -103,8 +104,7 @@ export function EmployeeForm({
       const dept = (initialData.departmentName || "").toLowerCase();
       let derivedRole: UserRole = "employee";
       if (title.includes("hr") || dept.includes("human resource")) derivedRole = "hr_admin";
-      else if (title.includes("payroll") || title.includes("finance")) derivedRole = "payroll_manager";
-      else if (title.includes("manager") || title.includes("lead") || title.includes("head")) derivedRole = "manager";
+      else if (title.includes("manager") || title.includes("lead") || title.includes("head") || title.includes("payroll") || title.includes("finance")) derivedRole = "manager";
 
       setFormData({
         firstName: initialData.firstName || "",
@@ -162,7 +162,7 @@ export function EmployeeForm({
       return "hr_admin";
     }
     if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || deptName.includes("payroll") || deptName.includes("finance")) {
-      return "payroll_manager";
+      return "manager";
     }
     if (title.includes("manager") || title.includes("lead") || title.includes("director") || title.includes("head") || title.includes("vp")) {
       return "manager";
@@ -553,94 +553,15 @@ export function EmployeeForm({
                   helperText="Primary email used for sign in"
                 />
 
-                {isSuperAdmin ? (
-                  <Select
-                    label="Assigned System Role"
-                    value={formData.portalRole}
-                    onChange={(e) => handleChange("portalRole", e.target.value)}
-                    helperText="Master authorization: Super Admins can delegate elevated system access"
-                  >
-                    <option value="employee">Employee (ESS Portal)</option>
-                    <option value="manager">Team Manager (Roster & Approvals)</option>
-                    <option value="hr_admin">HR Administrator</option>
-                    <option value="payroll_manager">Payroll Manager</option>
-                    <option value="super_admin">Super Admin</option>
-                  </Select>
-                ) : (
-                  <div className="space-y-1.5">
-                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
-                      Assigned System Role
-                    </label>
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
-                      <div className="flex items-center gap-2">
-                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
-                        <span className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200">
-                          Employee (ESS Self-Service)
-                        </span>
-                      </div>
-                      <Badge variant="secondary" size="sm">Standard Access</Badge>
-                    </div>
-                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                      <Lock className="w-3 h-3 text-slate-400 shrink-0" />
-                      Only Super Admins can delegate elevated roles. New staff default to Employee (ESS) portal.
-                    </p>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">
-                <div className="flex items-center justify-between">
-                  <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                    <KeyRound className="w-4 h-4 text-sky-600" />
-                    {isEditing ? "Update Login Password" : "Initial Password Configuration"}
+                <div className="mt-4 p-4 rounded-xl border border-sky-100 bg-sky-50 dark:border-sky-900/50 dark:bg-sky-900/20 text-sky-800 dark:text-sky-200">
+                  <h4 className="text-sm font-semibold flex items-center gap-2 mb-2">
+                    <ShieldAlert className="w-4 h-4" />
+                    Authentication Managed Externally
                   </h4>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={generateRandomPassword}
-                    leftIcon={<Sparkles className="w-3.5 h-3.5 text-amber-500" />}
-                  >
-                    Generate Strong Password
-                  </Button>
+                  <p className="text-xs">
+                    Roles are assigned strictly based on the user's email address. To grant portal access, Super Admins must create an authentication profile for this email via the Firebase Console.
+                  </p>
                 </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className="relative">
-                    <Input
-                      label={isEditing ? "New Password (Optional)" : "Set Initial Password"}
-                      type={showPassword ? "text" : "password"}
-                      required={!isEditing}
-                      value={formData.portalPassword}
-                      onChange={(e) => handleChange("portalPassword", e.target.value)}
-                      placeholder={isEditing ? "Leave blank to keep existing" : "Minimum 6 characters"}
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3 top-9 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
-                    >
-                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                    </button>
-                  </div>
-
-                  <Input
-                    label={isEditing ? "Confirm New Password" : "Confirm Password"}
-                    type={showPassword ? "text" : "password"}
-                    required={!isEditing && Boolean(formData.portalPassword)}
-                    value={formData.portalConfirmPassword}
-                    onChange={(e) => handleChange("portalConfirmPassword", e.target.value)}
-                    placeholder={isEditing ? "Repeat new password" : "Repeat password"}
-                  />
-                </div>
-
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {isEditing ? (
-                    "Enter a new password to update this employee's portal credentials on the server. Leave blank to keep existing password."
-                  ) : (
-                    <>Default temporary password: <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-sky-600 font-mono font-bold">Welcome@2026</code></>
-                  )}
-                </p>
               </div>
             </div>
           )}
