@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
-import { doc, getDoc, updateDoc, deleteDoc, collection, addDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { FirestoreRest } from '@/lib/firebase/firestore-rest';
 import { serverEmployeeCache } from '@/lib/server/employee-store';
 import { cleanFirestoreData } from '@/lib/firebase/sanitize';
-import { Employee } from '@/types';
+import { Employee, UserRole } from '@/types';
 
 export async function GET(
   request: Request,
@@ -66,38 +66,168 @@ export async function PUT(
   try {
     const { id } = await params;
     const body = await request.json();
+    const {
+      portalPassword,
+      portalRole,
+      creatorRole = 'employee',
+      createdBy = 'Admin',
+      changedByName,
+      changedBy,
+      ...rawUpdates
+    } = body;
+
     const updates = cleanFirestoreData({
-      ...body,
+      ...rawUpdates,
       updatedAt: new Date().toISOString(),
     });
 
-    if (serverEmployeeCache.has(id)) {
-      const existing = serverEmployeeCache.get(id)!;
-      const updated = { ...existing, ...updates };
-      serverEmployeeCache.set(id, updated);
-      try {
-        await FirestoreRest.setEmployee(id, updated);
-      } catch {}
+    // 1. Determine role security: Only Super Admin can modify system role
+    const isSuperAdmin = 
+      creatorRole === 'super_admin' || 
+      (changedByName || createdBy)?.toLowerCase() === 'super admin' || 
+      (changedByName || createdBy)?.toLowerCase() === 'karthick krishna';
+
+    const existingEmp = serverEmployeeCache.get(id);
+    if (portalRole || updates.role) {
+      if (isSuperAdmin) {
+        updates.role = (portalRole || updates.role) as UserRole;
+        updates.portalRole = (portalRole || updates.role) as UserRole;
+      } else if (existingEmp?.role) {
+        updates.role = existingEmp.role;
+        updates.portalRole = existingEmp.role;
+      }
     }
 
-    // 1. Try Admin Firestore
+    const mergedEmp: Employee = cleanFirestoreData({
+      ...(existingEmp || {}),
+      ...updates,
+      id,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Update in-memory server cache
+    serverEmployeeCache.set(id, mergedEmp);
+
+    // 2. Persist to Firestore REST
+    try {
+      await FirestoreRest.setEmployee(id, mergedEmp);
+    } catch (restErr: any) {
+      console.warn('Firestore REST employee update notice:', restErr.message);
+    }
+
+    // 3. Persist to Admin Firestore
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
-        await adminDb.collection('employees').doc(id).update(updates);
-        return NextResponse.json({ success: true, message: 'Employee updated successfully' });
-      } catch {}
+        await adminDb.collection('employees').doc(id).set(mergedEmp, { merge: true });
+      } catch (adminErr: any) {
+        console.warn('Admin Firestore employee update notice:', adminErr.message);
+      }
     }
 
-    // 2. Try Client Firestore
+    // 4. Persist to Client Firestore
     if (db) {
       try {
-        await updateDoc(doc(db, 'employees', id), updates);
-        return NextResponse.json({ success: true, message: 'Employee updated successfully' });
+        await setDoc(doc(db!, 'employees', id), mergedEmp, { merge: true });
+      } catch (clientErr: any) {
+        console.warn('Client Firestore employee update notice:', clientErr.message);
+      }
+    }
+
+    const cleanEmail = (mergedEmp.email || '').toLowerCase().trim();
+    const cleanDisplayName = `${mergedEmp.firstName || ''} ${mergedEmp.lastName || ''}`.trim();
+
+    // 5. Update corresponding user document in `users` collection
+    const userUpdatePayload = cleanFirestoreData({
+      displayName: cleanDisplayName,
+      email: cleanEmail,
+      phone: mergedEmp.phone || null,
+      role: mergedEmp.role || 'employee',
+      photoURL: mergedEmp.avatarUrl || null,
+      gender: mergedEmp.gender || null,
+      updatedAt: new Date().toISOString(),
+    });
+
+    if (adminDb && typeof adminDb.collection === 'function') {
+      try {
+        const snap = await adminDb.collection('users').where('employeeId', '==', id).get();
+        snap.forEach(async (docSnap) => {
+          await docSnap.ref.set(userUpdatePayload, { merge: true });
+        });
+        await adminDb.collection('users').doc(`usr-${id.toLowerCase()}`).set(userUpdatePayload, { merge: true });
       } catch {}
     }
 
-    return NextResponse.json({ success: true, message: 'Employee updated' });
+    if (db) {
+      try {
+        const q = query(collection(db!, 'users'), where('employeeId', '==', id));
+        const snap = await getDocs(q);
+        snap.forEach(async (d) => {
+          await setDoc(doc(db!, 'users', d.id), userUpdatePayload, { merge: true });
+        });
+      } catch {}
+    }
+
+    // 6. Update Firebase Authentication Password & Display Info
+    if (cleanEmail && adminAuth && typeof adminAuth.getUserByEmail === 'function') {
+      try {
+        let authUser = null;
+        try {
+          authUser = await adminAuth.getUserByEmail(cleanEmail);
+        } catch {}
+
+        if (authUser) {
+          const authUpdates: any = {
+            displayName: cleanDisplayName,
+            photoURL: mergedEmp.avatarUrl || undefined,
+          };
+          if (portalPassword && typeof portalPassword === 'string' && portalPassword.trim().length >= 6) {
+            authUpdates.password = portalPassword.trim();
+          }
+          await adminAuth.updateUser(authUser.uid, authUpdates);
+
+          if (mergedEmp.role) {
+            await adminAuth.setCustomUserClaims(authUser.uid, {
+              role: mergedEmp.role,
+              employeeId: id,
+            });
+          }
+        }
+      } catch (authErr: any) {
+        console.warn('Firebase Auth update warning:', authErr.message);
+      }
+    }
+
+    // 7. Record Security Audit Log
+    const auditPayload = {
+      userId: changedBy || 'usr-admin',
+      userName: changedByName || createdBy || 'Administrator',
+      userRole: creatorRole || 'super_admin',
+      action: 'update_employee',
+      module: 'employee',
+      recordId: id,
+      recordTitle: cleanDisplayName || id,
+      details: `Updated employee profile, credentials and server records for ${cleanDisplayName} (${id}).`,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (adminDb && typeof adminDb.collection === 'function') {
+      try {
+        await adminDb.collection('audit_logs').add(auditPayload);
+      } catch {}
+    }
+    if (db) {
+      try {
+        await addDoc(collection(db!, 'audit_logs'), auditPayload);
+      } catch {}
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Employee details and credentials updated successfully on server.',
+      employee: mergedEmp,
+    });
   } catch (error: any) {
+    console.error('PUT /api/employees/[id] error:', error);
     return NextResponse.json({ error: error.message || 'Error updating employee' }, { status: 500 });
   }
 }

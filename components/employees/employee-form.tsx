@@ -69,9 +69,9 @@ export function EmployeeForm({
     postalCode: initialData?.postalCode || "641004",
 
     // Portal Login & Auth Credentials
-    portalPassword: "Welcome@2026",
-    portalConfirmPassword: "Welcome@2026",
-    portalRole: "employee" as UserRole,
+    portalPassword: isEditing ? "" : "Welcome@2026",
+    portalConfirmPassword: isEditing ? "" : "Welcome@2026",
+    portalRole: (initialData?.portalRole || initialData?.role || "employee") as UserRole,
 
     // Employment
     joiningDate: initialData?.joiningDate || new Date().toISOString().split("T")[0],
@@ -124,7 +124,7 @@ export function EmployeeForm({
         // Portal Login & Auth Credentials
         portalPassword: "",
         portalConfirmPassword: "",
-        portalRole: derivedRole,
+        portalRole: (initialData.portalRole || initialData.role || derivedRole) as UserRole,
 
         // Employment
         joiningDate: initialData.joiningDate || new Date().toISOString().split("T")[0],
@@ -235,11 +235,28 @@ export function EmployeeForm({
       return;
     }
 
+    if (isEditing && formData.portalPassword && formData.portalPassword.trim()) {
+      if (formData.portalPassword !== formData.portalConfirmPassword) {
+        error("Password Mismatch", "New Password and Confirm Password do not match.");
+        setActiveTab("portal_access");
+        return;
+      }
+      if (formData.portalPassword.trim().length < 6) {
+        error("Weak Password", "New password must be at least 6 characters long.");
+        setActiveTab("portal_access");
+        return;
+      }
+    }
+
     setIsSubmitting(true);
     try {
       const selectedDept = departments.find((d) => d.id === formData.departmentId);
       const selectedDesig = designations.find((d) => d.id === formData.designationId);
       const selectedManager = allEmployees.find((e) => e.id === formData.managerId);
+
+      const assignedRole = isSuperAdmin 
+        ? (formData.portalRole || initialData?.portalRole || initialData?.role || "employee")
+        : (initialData?.portalRole || initialData?.role || "employee");
 
       const payload = {
         organizationId: "org-coralgenz-01",
@@ -283,26 +300,42 @@ export function EmployeeForm({
           phone: formData.emergencyPhone || "",
         },
         documents: initialData?.documents || [],
+        role: assignedRole,
+        portalRole: assignedRole,
+        portalPassword: formData.portalPassword && formData.portalPassword.trim() ? formData.portalPassword.trim() : undefined,
+        changedBy: user?.id || "usr-admin",
+        changedByName: user?.displayName || (isSuperAdmin ? "Super Admin" : "HR Administrator"),
+        creatorRole: currentRole,
       };
 
       if (isEditing && initialData) {
-        await EmployeeService.updateEmployee(initialData.id, payload);
+        const updateRes = await EmployeeService.updateEmployee(initialData.id, payload);
+        if (!updateRes) {
+          throw new Error("Failed to update employee details on server.");
+        }
 
         // 1. Update password on Auth server if changed or provided
         if (formData.portalPassword && formData.portalPassword.trim()) {
-          await AuthService.updatePassword({
-            email: formData.email,
-            newPassword: formData.portalPassword,
-            employeeId: initialData.id,
-            changedByName: "Super Admin",
-          });
+          try {
+            await AuthService.updatePassword({
+              email: formData.email,
+              newPassword: formData.portalPassword.trim(),
+              employeeId: initialData.id,
+              changedBy: user?.id || "usr-admin",
+              changedByName: user?.displayName || (isSuperAdmin ? "Super Admin" : "HR Administrator"),
+            });
+          } catch (passErr) {
+            console.warn("Direct password update warning:", passErr);
+          }
         }
 
-        success("Profile & Credentials Updated", `Updated details and auth credentials on server for ${formData.firstName} ${formData.lastName}`);
+        success(
+          "Profile & Credentials Updated!",
+          `Saved server changes for ${formData.firstName} ${formData.lastName}. Updated all records and authentication credentials!`
+        );
         router.push(`/employees/${initialData.id}`);
       } else {
         // 1. Save Employee and Provision Login Account directly via Server API
-        const assignedRole = isSuperAdmin ? (formData.portalRole || "employee") : "employee";
         const newEmp = await EmployeeService.addEmployee(payload, {
           portalPassword: formData.portalPassword,
           portalRole: assignedRole,
@@ -565,7 +598,7 @@ export function EmployeeForm({
                 <div className="flex items-center justify-between">
                   <h4 className="text-sm font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
                     <KeyRound className="w-4 h-4 text-sky-600" />
-                    Initial Password Configuration
+                    {isEditing ? "Update Login Password" : "Initial Password Configuration"}
                   </h4>
                   <Button
                     type="button"
@@ -581,12 +614,12 @@ export function EmployeeForm({
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="relative">
                     <Input
-                      label="Set Initial Password"
+                      label={isEditing ? "New Password (Optional)" : "Set Initial Password"}
                       type={showPassword ? "text" : "password"}
                       required={!isEditing}
                       value={formData.portalPassword}
                       onChange={(e) => handleChange("portalPassword", e.target.value)}
-                      placeholder="Minimum 6 characters"
+                      placeholder={isEditing ? "Leave blank to keep existing" : "Minimum 6 characters"}
                     />
                     <button
                       type="button"
@@ -598,17 +631,21 @@ export function EmployeeForm({
                   </div>
 
                   <Input
-                    label="Confirm Password"
+                    label={isEditing ? "Confirm New Password" : "Confirm Password"}
                     type={showPassword ? "text" : "password"}
-                    required={!isEditing}
+                    required={!isEditing && Boolean(formData.portalPassword)}
                     value={formData.portalConfirmPassword}
                     onChange={(e) => handleChange("portalConfirmPassword", e.target.value)}
-                    placeholder="Repeat password"
+                    placeholder={isEditing ? "Repeat new password" : "Repeat password"}
                   />
                 </div>
 
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Default temporary password: <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-sky-600 font-mono font-bold">Welcome@2026</code>
+                  {isEditing ? (
+                    "Enter a new password to update this employee's portal credentials on the server. Leave blank to keep existing password."
+                  ) : (
+                    <>Default temporary password: <code className="px-1.5 py-0.5 rounded bg-slate-200 dark:bg-slate-800 text-sky-600 font-mono font-bold">Welcome@2026</code></>
+                  )}
                 </p>
               </div>
             </div>

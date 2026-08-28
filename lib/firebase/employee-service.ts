@@ -165,7 +165,12 @@ export class EmployeeService {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sanitizedUpdates),
       });
-      if (res.ok) return true;
+      if (res.ok) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
+        }
+        return true;
+      }
     } catch {
       // Fall through
     }
@@ -174,14 +179,22 @@ export class EmployeeService {
     if (isFirebaseConfigured && db) {
       try {
         const docRef = doc(db, this.collectionName, id);
-        await updateDoc(docRef, {
+        await setDoc(docRef, {
           ...sanitizedUpdates,
           updatedAt: new Date().toISOString(),
-        });
+        }, { merge: true });
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
+        }
         return true;
-      } catch {}
+      } catch (clientErr: any) {
+        console.error('Client Firestore updateEmployee error:', clientErr.message);
+      }
     }
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
+    }
     return true;
   }
 
