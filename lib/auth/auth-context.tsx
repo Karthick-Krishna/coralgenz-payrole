@@ -39,7 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isSuperAdmin = baseRole === "super_admin" || user?.email?.toLowerCase() === "karthick@coralgenz.co.in";
 
-  // Pure Server Profile Resolver directly from Firestore
+  // Pure Server Profile Resolver directly from Firestore & Server API
   const resolveUserProfile = async (uid: string, email: string) => {
     const cleanEmail = email.toLowerCase().trim();
     let role: UserRole = "employee";
@@ -48,7 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let photoURL: string | undefined = undefined;
 
     // 1. Super Admin special identity
-    if (cleanEmail === "karthick@coralgenz.co.in") {
+    if (cleanEmail === "karthick@coralgenz.co.in" || cleanEmail === "admin@coralgenz.co.in") {
       return {
         role: "super_admin" as UserRole,
         employeeId: "CGG-EMP-0001",
@@ -57,9 +57,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       };
     }
 
+    // 2. Fetch authoritative profile from server endpoint
+    try {
+      const res = await fetch(`/api/auth/profile?email=${encodeURIComponent(cleanEmail)}&uid=${encodeURIComponent(uid)}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.profile) {
+          return {
+            role: data.profile.role as UserRole,
+            employeeId: data.profile.employeeId || "",
+            displayName: data.profile.displayName || displayName,
+            photoURL: data.profile.photoURL || undefined,
+          };
+        }
+      }
+    } catch (e) {
+      console.warn("Server profile API notice:", e);
+    }
+
+    // 3. Fallback client Firestore checks
     if (isFirebaseConfigured && db) {
       try {
-        // 2. Check Firestore users collection by document ID
         const userDocRef = doc(db, "users", uid);
         const userDoc = await getDoc(userDocRef);
 
@@ -70,7 +88,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           displayName = data.displayName || displayName;
           photoURL = data.photoURL || photoURL;
         } else {
-          // 3. Check Firestore users collection by email query
           const uQuery = query(collection(db, "users"), where("email", "==", cleanEmail));
           const uSnap = await getDocs(uQuery);
           if (!uSnap.empty) {
@@ -82,7 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // 4. Check Firestore employees collection to enrich designation and department role
         const empQuery = query(collection(db, "employees"), where("email", "==", cleanEmail));
         const empSnap = await getDocs(empQuery);
         if (!empSnap.empty) {
@@ -90,18 +106,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           employeeId = emp.id || employeeId;
           displayName = `${emp.firstName} ${emp.lastName}`;
           photoURL = emp.avatarUrl || photoURL;
+          if (emp.role) {
+            role = emp.role as UserRole;
+          } else {
+            const title = (emp.designationTitle || "").toLowerCase();
+            const dept = (emp.departmentName || "").toLowerCase();
 
-          const title = (emp.designationTitle || "").toLowerCase();
-          const dept = (emp.departmentName || "").toLowerCase();
-
-          if (title.includes("super admin") || title.includes("founder") || title.includes("director")) {
-            role = "super_admin";
-          } else if (title.includes("hr") || title.includes("human resource") || dept.includes("human resource")) {
-            role = "hr_admin";
-          } else if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || dept.includes("finance")) {
-            role = "payroll_manager";
-          } else if (title.includes("manager") || title.includes("lead") || title.includes("head") || title.includes("vp")) {
-            role = "manager";
+            if (title.includes("super admin") || title.includes("founder") || title.includes("director")) {
+              role = "super_admin";
+            } else if (title.includes("hr") || title.includes("human resource") || dept.includes("human resource")) {
+              role = "hr_admin";
+            } else if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || dept.includes("finance")) {
+              role = "payroll_manager";
+            } else if (title.includes("manager") || title.includes("lead") || title.includes("head") || title.includes("vp")) {
+              role = "manager";
+            }
           }
         }
       } catch (err: any) {
@@ -149,7 +168,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     email: string,
     pass: string,
     expectedPortalRole?: UserRole
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; role?: UserRole }> => {
     setIsLoading(true);
     const cleanEmail = email.toLowerCase().trim();
 
@@ -166,32 +185,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         const isSuper = cleanEmail === "karthick@coralgenz.co.in" || profile.role === "super_admin";
         
-        // Check portal authorization
-        const isPortalAllowed =
-          isSuper ||
-          !expectedPortalRole ||
-          expectedPortalRole === "employee" ||
-          expectedPortalRole === profile.role;
-
-        if (!isPortalAllowed && expectedPortalRole) {
-          await fbSignOut(firebaseAuth);
-          setIsLoading(false);
-          const roleLabels: Record<UserRole, string> = {
-            super_admin: "Super Admin",
-            hr_admin: "HR Administrator",
-            payroll_manager: "Payroll Manager",
-            manager: "Team Manager",
-            employee: "Employee (ESS)",
-          };
-          return {
-            success: false,
-            error: `Access Denied: Your account role is '${roleLabels[profile.role] || profile.role}'. Please switch to the ${roleLabels[profile.role] || profile.role} portal.`,
-          };
-        }
-
+        // Active role automatically matches the employee's assigned role
         const activeRole: UserRole = isSuper
           ? (expectedPortalRole || "super_admin")
-          : (expectedPortalRole === "employee" ? "employee" : profile.role);
+          : profile.role;
 
         const loggedUser: User = {
           id: fbUser.uid,
@@ -207,7 +204,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         };
 
         setUser(loggedUser);
-        setBaseRole(isSuper ? "super_admin" : activeRole);
+        setBaseRole(activeRole);
         setIsDemoMode(false);
         setIsLoading(false);
 
@@ -217,10 +214,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           userRole: loggedUser.role,
           action: "login",
           module: "auth",
-          details: `User ${loggedUser.displayName} (${cleanEmail}) authenticated successfully into ${loggedUser.role} portal.`,
+          details: `User ${loggedUser.displayName} (${cleanEmail}) authenticated successfully with role '${loggedUser.role}'.`,
         });
 
-        return { success: true };
+        return { success: true, role: activeRole };
       } catch (fbErr: any) {
         setIsLoading(false);
         const fbErrorCode = fbErr?.code || "";

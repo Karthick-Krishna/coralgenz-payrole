@@ -203,6 +203,10 @@ export interface Employee {
   // Exit Information (if applicable)
   exitInfo?: EmployeeExitInfo;
 
+  // Portal & Role
+  role?: UserRole;
+  portalRole?: UserRole;
+
   createdAt: string;
   updatedAt: string;
 }

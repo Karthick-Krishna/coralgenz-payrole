@@ -111,7 +111,7 @@ export default function LoginPage() {
     setIsLoading(false);
 
     if (res.success) {
-      success("Authenticated Successfully", `Welcome to ${selectedPortal.title}.`);
+      success("Authenticated Successfully", "Welcome to Coralgenz.");
       router.push("/dashboard");
     } else {
       toastError("Authentication Failed", res.error || "Invalid credentials or unauthorized portal access.");

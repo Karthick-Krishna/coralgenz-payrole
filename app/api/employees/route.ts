@@ -109,6 +109,8 @@ export async function POST(request: Request) {
       ...employeeData,
       id: nextId,
       email: cleanEmail,
+      role: portalRole || 'employee',
+      portalRole: portalRole || 'employee',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -160,6 +162,7 @@ export async function POST(request: Request) {
             const existingUser = await adminAuth.getUserByEmail(cleanEmail);
             uid = existingUser.uid;
             await adminAuth.updateUser(uid, { password: cleanPassword });
+            await adminAuth.setCustomUserClaims(uid, { role: portalRole, employeeId: nextId });
           } catch {}
         }
       }
@@ -206,11 +209,13 @@ export async function POST(request: Request) {
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
         await adminDb.collection('users').doc(uid).set(userPayload, { merge: true });
+        await adminDb.collection('users').doc(nextId).set(userPayload, { merge: true });
       } catch {}
     }
     if (db) {
       try {
         await setDoc(doc(db, 'users', uid), userPayload, { merge: true });
+        await setDoc(doc(db, 'users', nextId), userPayload, { merge: true });
       } catch {}
     }
 
