@@ -11,6 +11,8 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Tabs } from "@/components/ui/tabs";
 import { useToast } from "@/components/ui/toast";
+import { Badge } from "@/components/ui/badge";
+import { useAuth } from "@/lib/auth/auth-context";
 import {
   User,
   Briefcase,
@@ -25,6 +27,7 @@ import {
   Sparkles,
   Eye,
   EyeOff,
+  Lock,
 } from "lucide-react";
 
 interface EmployeeFormProps {
@@ -43,6 +46,7 @@ export function EmployeeForm({
   isEditing = false,
 }: EmployeeFormProps) {
   const router = useRouter();
+  const { isSuperAdmin, currentRole, user } = useAuth();
   const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState("personal");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -148,6 +152,7 @@ export function EmployeeForm({
   }, [initialData, departments, designations]);
 
   const inferRoleFromDesignation = (desigId?: string, deptId?: string): UserRole => {
+    if (!isSuperAdmin) return "employee";
     const desig = designations.find((d) => d.id === desigId);
     const dept = departments.find((d) => d.id === deptId);
     const title = (desig?.title || "").toLowerCase();
@@ -176,9 +181,9 @@ export function EmployeeForm({
           updated.email = `${fn.toLowerCase().replace(/\s+/g, "")}.${ln.toLowerCase().replace(/\s+/g, "")}@coralgenz.co.in`;
         }
       }
-      // Auto-update system role when designation changes
+      // Auto-update system role when designation changes (only for Super Admins)
       if (field === "designationId" && !isEditing) {
-        updated.portalRole = inferRoleFromDesignation(value as string, prev.departmentId);
+        updated.portalRole = isSuperAdmin ? inferRoleFromDesignation(value as string, prev.departmentId) : "employee";
       }
       return updated;
     });
@@ -187,12 +192,12 @@ export function EmployeeForm({
   const handleDepartmentChange = (deptId: string) => {
     const validDesig = designations.find((d) => d.departmentId === deptId);
     const nextDesigId = validDesig ? validDesig.id : formData.designationId;
-    const suggestedRole = inferRoleFromDesignation(nextDesigId, deptId);
+    const suggestedRole = isSuperAdmin ? inferRoleFromDesignation(nextDesigId, deptId) : "employee";
     setFormData((prev) => ({
       ...prev,
       departmentId: deptId,
       designationId: nextDesigId,
-      portalRole: isEditing ? prev.portalRole : suggestedRole,
+      portalRole: isEditing ? (isSuperAdmin ? prev.portalRole : "employee") : suggestedRole,
     }));
   };
 
@@ -297,10 +302,11 @@ export function EmployeeForm({
         router.push(`/employees/${initialData.id}`);
       } else {
         // 1. Save Employee and Provision Login Account directly via Server API
+        const assignedRole = isSuperAdmin ? (formData.portalRole || "employee") : "employee";
         const newEmp = await EmployeeService.addEmployee(payload, {
           portalPassword: formData.portalPassword,
-          portalRole: formData.portalRole,
-          createdBy: "Super Admin",
+          portalRole: assignedRole,
+          createdBy: user?.displayName || (isSuperAdmin ? "Super Admin" : "HR Administrator"),
         });
         
         if (!newEmp) {
@@ -309,7 +315,7 @@ export function EmployeeForm({
 
         success(
           "Employee & Auth Login Created!",
-          `Added ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}). Login credentials created on server for ${formData.email}!`
+          `Added ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}). Login credentials created on server with ${assignedRole.replace("_", " ").toUpperCase()} portal access!`
         );
         router.push(`/employees/${newEmp.id}`);
       }
@@ -519,18 +525,40 @@ export function EmployeeForm({
                   placeholder="e.g. arun.kumar@coralgenz.co.in"
                   helperText="Primary email used for sign in"
                 />
-                <Select
-                  label="Assigned System Role"
-                  value={formData.portalRole}
-                  onChange={(e) => handleChange("portalRole", e.target.value)}
-                  helperText="Access role authorized for this staff member"
-                >
-                  <option value="employee">Employee (ESS Portal)</option>
-                  <option value="manager">Team Manager (Roster & Approvals)</option>
-                  <option value="hr_admin">HR Administrator</option>
-                  <option value="payroll_manager">Payroll Manager</option>
-                  <option value="super_admin">Super Admin</option>
-                </Select>
+
+                {isSuperAdmin ? (
+                  <Select
+                    label="Assigned System Role"
+                    value={formData.portalRole}
+                    onChange={(e) => handleChange("portalRole", e.target.value)}
+                    helperText="Master authorization: Super Admins can delegate elevated system access"
+                  >
+                    <option value="employee">Employee (ESS Portal)</option>
+                    <option value="manager">Team Manager (Roster & Approvals)</option>
+                    <option value="hr_admin">HR Administrator</option>
+                    <option value="payroll_manager">Payroll Manager</option>
+                    <option value="super_admin">Super Admin</option>
+                  </Select>
+                ) : (
+                  <div className="space-y-1.5">
+                    <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300">
+                      Assigned System Role
+                    </label>
+                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700">
+                      <div className="flex items-center gap-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                        <span className="text-xs sm:text-sm font-medium text-slate-800 dark:text-slate-200">
+                          Employee (ESS Self-Service)
+                        </span>
+                      </div>
+                      <Badge variant="secondary" size="sm">Standard Access</Badge>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                      <Lock className="w-3 h-3 text-slate-400 shrink-0" />
+                      Only Super Admins can delegate elevated roles. New staff default to Employee (ESS) portal.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="p-4 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-900/50 space-y-4">

@@ -77,6 +77,7 @@ export async function POST(request: Request) {
       portalPassword = 'Welcome@2026',
       portalRole = 'employee',
       createdBy = 'Super Admin',
+      creatorRole = 'super_admin',
     } = body;
 
     if (!employeeData || !employeeData.firstName || !employeeData.email) {
@@ -88,6 +89,15 @@ export async function POST(request: Request) {
 
     const cleanEmail = employeeData.email.toLowerCase().trim();
     const cleanPassword = (portalPassword || 'Welcome@2026').trim();
+
+    // Security check: Only Super Admin can assign elevated system roles.
+    const isSuperAdminCreator = 
+      creatorRole === 'super_admin' || 
+      createdBy?.toLowerCase() === 'super admin' || 
+      createdBy?.toLowerCase() === 'karthick krishna' || 
+      createdBy?.toLowerCase() === 'karthick@coralgenz.co.in';
+
+    const effectiveRole: UserRole = isSuperAdminCreator ? (portalRole || 'employee') : 'employee';
 
     // 1. Calculate next sequential Employee ID
     let currentCount = serverEmployeeCache.size;
@@ -109,8 +119,8 @@ export async function POST(request: Request) {
       ...employeeData,
       id: nextId,
       email: cleanEmail,
-      role: portalRole || 'employee',
-      portalRole: portalRole || 'employee',
+      role: effectiveRole,
+      portalRole: effectiveRole,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     });
@@ -154,7 +164,7 @@ export async function POST(request: Request) {
         });
         uid = userRecord.uid;
         try {
-          await adminAuth.setCustomUserClaims(uid, { role: portalRole, employeeId: nextId });
+          await adminAuth.setCustomUserClaims(uid, { role: effectiveRole, employeeId: nextId });
         } catch {}
       } catch (authError: any) {
         if (authError.code === 'auth/email-already-exists' || authError.code === 'auth/email-already-in-use') {
@@ -162,7 +172,7 @@ export async function POST(request: Request) {
             const existingUser = await adminAuth.getUserByEmail(cleanEmail);
             uid = existingUser.uid;
             await adminAuth.updateUser(uid, { password: cleanPassword });
-            await adminAuth.setCustomUserClaims(uid, { role: portalRole, employeeId: nextId });
+            await adminAuth.setCustomUserClaims(uid, { role: effectiveRole, employeeId: nextId });
           } catch {}
         }
       }
@@ -196,7 +206,7 @@ export async function POST(request: Request) {
       employeeId: nextId,
       email: cleanEmail,
       displayName: `${newEmp.firstName} ${newEmp.lastName}`,
-      role: (portalRole || 'employee') as UserRole,
+      role: effectiveRole,
       photoURL: newEmp.avatarUrl || null,
       phone: newEmp.phone || null,
       gender: newEmp.gender || null,
