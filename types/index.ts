@@ -113,6 +113,7 @@ export interface BankDetails {
   ifscCode: string;
   branchName: string;
   accountType?: 'savings' | 'current' | 'salary';
+  panNumber?: string;
 }
 
 export interface EmergencyContact {
@@ -169,6 +170,7 @@ export interface Employee {
   avatarUrl?: string;
   dateOfBirth: string;
   gender: 'male' | 'female' | 'other' | 'prefer_not_to_say';
+  panNumber?: string;
   address: string;
   city: string;
   state: string;
@@ -356,6 +358,7 @@ export interface PayrollItem {
   employeeCode: string;
   departmentName: string;
   designationTitle: string;
+  panNumber?: string;
   bankAccountNumber: string;
   bankName: string;
   ifscCode: string;

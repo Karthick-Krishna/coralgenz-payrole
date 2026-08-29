@@ -75,16 +75,15 @@ export function PayslipViewer({ payslip, organization }: PayslipViewerProps) {
               <div className="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center shadow-sm overflow-hidden shrink-0">
                 <img src="/logo.png" alt="Coralgenz" className="w-full h-full object-contain" />
               </div>
-              <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
-                {organization.name}
-              </h2>
+              <div>
+                <h2 className="text-xl font-extrabold text-slate-900 dark:text-slate-100 tracking-tight">
+                  {organization.name}
+                </h2>
+                <p className="text-xs text-slate-500 dark:text-slate-400">
+                  Smart Payroll & Workforce Management
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm">
-              {organization.address}, {organization.city}, {organization.state}, {organization.country} - {organization.postalCode}
-            </p>
-            <p className="text-[11px] text-slate-400 font-mono">
-              CIN/GSTIN: {organization.gstin || "29AAACC1234K1Z5"} • PAN: {organization.panNumber || "AAACC1234K"}
-            </p>
           </div>
 
           <div className="text-left sm:text-right space-y-1">
@@ -132,8 +131,8 @@ export function PayslipViewer({ payslip, organization }: PayslipViewerProps) {
             <p className="font-mono font-medium text-slate-800 dark:text-slate-200 mt-0.5">{payslip.ifscCode}</p>
           </div>
           <div>
-            <span className="text-[10px] uppercase font-bold text-slate-400">UAN / PF No.</span>
-            <p className="font-mono font-medium text-slate-800 dark:text-slate-200 mt-0.5">{payslip.uanNumber || "100987654321"}</p>
+            <span className="text-[10px] uppercase font-bold text-slate-400">PAN Number</span>
+            <p className="font-mono font-bold text-slate-900 dark:text-slate-100 mt-0.5">{payslip.panNumber || "—"}</p>
           </div>
         </div>
 

@@ -227,7 +227,7 @@ export function generatePayslipFromItem(
     departmentName: item.departmentName,
     designationTitle: item.designationTitle,
     joiningDate: employee.joiningDate,
-    panNumber: employee.bankDetails ? "ABCDE1234F" : undefined,
+    panNumber: employee.panNumber || employee.bankDetails?.panNumber || item.panNumber || undefined,
     uanNumber: "100987654321",
     bankName: item.bankName || "State Bank of India",
     maskedAccountNumber,

@@ -486,6 +486,13 @@ export function EmployeeProfile({
                 </p>
               </div>
 
+              <div className="space-y-1">
+                <span className="font-semibold text-slate-400 uppercase text-[10px]">PAN Card Number</span>
+                <p className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                  {employee.panNumber || employee.bankDetails?.panNumber || "—"}
+                </p>
+              </div>
+
               <div className="sm:col-span-2 space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
                 <span className="font-semibold text-slate-400 uppercase text-[10px]">Residential Address</span>
                 <p className="font-medium text-slate-900 dark:text-slate-100 flex items-start gap-2">
@@ -646,6 +653,7 @@ export function EmployeeProfile({
 
               <div className="space-y-1.5 text-slate-500 text-[11px]">
                 <p>• Branch: {employee.bankDetails?.branchName || "Main Branch"}</p>
+                <p>• PAN Number: <span className="font-mono font-bold text-slate-800 dark:text-slate-200">{employee.panNumber || employee.bankDetails?.panNumber || "—"}</span></p>
                 <p>• Account Type: Salary Account (Automated NEFT/IMPS)</p>
                 <p>• Sensitive banking numbers masked according to ISO/IEC 27001 data privacy standards.</p>
               </div>

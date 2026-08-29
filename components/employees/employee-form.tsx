@@ -84,7 +84,8 @@ export function EmployeeForm({
     workLocation: initialData?.workLocation || "Coimbatore HQ",
     currentMonthlyGross: initialData?.currentMonthlyGross || 60000,
 
-    // Bank
+    // Financial & Bank
+    panNumber: initialData?.panNumber || initialData?.bankDetails?.panNumber || "",
     bankName: initialData?.bankDetails?.bankName || "HDFC Bank",
     accountHolderName: initialData?.bankDetails?.accountHolderName || "",
     accountNumber: initialData?.bankDetails?.accountNumber || "",
@@ -136,7 +137,8 @@ export function EmployeeForm({
         workLocation: initialData.workLocation || "Coimbatore HQ",
         currentMonthlyGross: initialData.currentMonthlyGross || 60000,
 
-        // Bank
+        // Bank & Financial
+        panNumber: initialData.panNumber || initialData.bankDetails?.panNumber || "",
         bankName: initialData.bankDetails?.bankName || "HDFC Bank",
         accountHolderName: initialData.bankDetails?.accountHolderName || `${initialData.firstName} ${initialData.lastName}`,
         accountNumber: initialData.bankDetails?.accountNumber || "",
@@ -250,6 +252,7 @@ export function EmployeeForm({
         avatarUrl: formData.avatarUrl.trim() || null,
         dateOfBirth: formData.dateOfBirth,
         gender: formData.gender as "male" | "female" | "other",
+        panNumber: formData.panNumber.trim().toUpperCase() || null,
         address: formData.address.trim() || null,
         city: formData.city.trim() || null,
         state: formData.state.trim() || null,
@@ -275,6 +278,7 @@ export function EmployeeForm({
           ifscCode: formData.ifscCode || "",
           branchName: formData.branchName || "",
           accountType: "salary" as const,
+          panNumber: formData.panNumber.trim().toUpperCase() || undefined,
         },
         emergencyContact: {
           name: formData.emergencyName || "",
@@ -448,7 +452,7 @@ export function EmployeeForm({
                 />
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <Input
                   label="Phone Number"
                   value={formData.phone}
@@ -470,6 +474,13 @@ export function EmployeeForm({
                   <option value="female">Female</option>
                   <option value="other">Other</option>
                 </Select>
+                <Input
+                  label="PAN Card Number"
+                  value={formData.panNumber}
+                  onChange={(e) => handleChange("panNumber", e.target.value.toUpperCase())}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
+                />
               </div>
 
               <Input
@@ -699,12 +710,22 @@ export function EmployeeForm({
                 />
               </div>
 
-              <Input
-                label="Branch Name"
-                value={formData.branchName}
-                onChange={(e) => handleChange("branchName", e.target.value)}
-                placeholder="e.g. RS Puram Branch, Coimbatore"
-              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Input
+                  label="Branch Name"
+                  value={formData.branchName}
+                  onChange={(e) => handleChange("branchName", e.target.value)}
+                  placeholder="e.g. RS Puram Branch, Coimbatore"
+                />
+                <Input
+                  label="Permanent Account Number (PAN)"
+                  value={formData.panNumber}
+                  onChange={(e) => handleChange("panNumber", e.target.value.toUpperCase())}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
+                  helperText="Official PAN number displayed on payslips and tax reports"
+                />
+              </div>
             </div>
           )}
 
