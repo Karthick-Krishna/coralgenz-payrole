@@ -227,70 +227,93 @@ export class EmployeeService {
     id: string,
     updates: Partial<Employee> | Record<string, any>
   ): Promise<boolean> {
-    if (!id || !isFirebaseConfigured || !db) return false;
+    if (!id) return false;
 
     const sanitizedUpdates = cleanFirestoreData(updates);
+    let serverSuccess = false;
 
+    // 1. Primary: Server API Update (/api/employees/[id])
     try {
-      const docRef = doc(db, this.collectionName, id);
-      const updatePayload = {
-        ...sanitizedUpdates,
-        id,
-        updatedAt: new Date().toISOString(),
-      };
-
-      // 1. Atomically save updates to Firestore with merge
-      await setDoc(docRef, updatePayload, { merge: true });
-
-      // 2. Synchronize user profile in 'users' collection if names, email, role, or avatar changed
-      try {
-        const userQuery = query(collection(db, 'users'), where('employeeId', '==', id));
-        const userSnap = await getDocs(userQuery);
-        for (const uDoc of userSnap.docs) {
-          const userUpdates: Record<string, any> = { updatedAt: new Date().toISOString() };
-          if (sanitizedUpdates.firstName || sanitizedUpdates.lastName) {
-            userUpdates.displayName = `${sanitizedUpdates.firstName || ''} ${sanitizedUpdates.lastName || ''}`.trim();
-          }
-          if (sanitizedUpdates.email) userUpdates.email = sanitizedUpdates.email;
-          if (sanitizedUpdates.portalRole || sanitizedUpdates.role) {
-            userUpdates.role = sanitizedUpdates.portalRole || sanitizedUpdates.role;
-          }
-          if (sanitizedUpdates.departmentName) userUpdates.departmentName = sanitizedUpdates.departmentName;
-          if (sanitizedUpdates.avatarUrl) userUpdates.avatarUrl = sanitizedUpdates.avatarUrl;
-          await setDoc(doc(db, 'users', uDoc.id), cleanFirestoreData(userUpdates), { merge: true });
-        }
-      } catch (userSyncErr) {
-        console.warn('User doc sync warning:', userSyncErr);
+      const res = await fetch(`/api/employees/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sanitizedUpdates),
+      });
+      if (res.ok) {
+        serverSuccess = true;
       }
+    } catch (apiErr) {
+      console.warn('API updateEmployee notice:', apiErr);
+    }
 
-      // 3. Synchronize open/draft payroll items with updated employee details
+    // 2. Direct Firestore SDK update (ensures immediate local client cache consistency)
+    if (isFirebaseConfigured && db) {
       try {
-        const itemQuery = query(collection(db, 'payrollItems'), where('employeeId', '==', id));
-        const itemSnap = await getDocs(itemQuery);
-        for (const iDoc of itemSnap.docs) {
-          const itemData = iDoc.data();
-          if (itemData.status === 'draft' || itemData.status === 'pending') {
-            const itemUpdates: Record<string, any> = {};
+        const docRef = doc(db, this.collectionName, id);
+        const updatePayload = {
+          ...sanitizedUpdates,
+          id,
+          updatedAt: new Date().toISOString(),
+        };
+
+        // Atomically save updates to Firestore with merge
+        await setDoc(docRef, updatePayload, { merge: true });
+        serverSuccess = true;
+
+        // Synchronize user profile in 'users' collection if names, email, role, or avatar changed
+        try {
+          const userQuery = query(collection(db, 'users'), where('employeeId', '==', id));
+          const userSnap = await getDocs(userQuery);
+          for (const uDoc of userSnap.docs) {
+            const userUpdates: Record<string, any> = { updatedAt: new Date().toISOString() };
             if (sanitizedUpdates.firstName || sanitizedUpdates.lastName) {
-              itemUpdates.employeeName = `${sanitizedUpdates.firstName || ''} ${sanitizedUpdates.lastName || ''}`.trim();
+              userUpdates.displayName = `${sanitizedUpdates.firstName || ''} ${sanitizedUpdates.lastName || ''}`.trim();
             }
-            if (sanitizedUpdates.panNumber) itemUpdates.panNumber = sanitizedUpdates.panNumber;
-            if (sanitizedUpdates.bankDetails) {
-              itemUpdates.bankName = sanitizedUpdates.bankDetails.bankName;
-              itemUpdates.bankAccountNumber = sanitizedUpdates.bankDetails.accountNumber;
-              itemUpdates.ifscCode = sanitizedUpdates.bankDetails.ifscCode;
+            if (sanitizedUpdates.email) userUpdates.email = sanitizedUpdates.email;
+            if (sanitizedUpdates.portalRole || sanitizedUpdates.role) {
+              userUpdates.role = sanitizedUpdates.portalRole || sanitizedUpdates.role;
             }
-            if (sanitizedUpdates.departmentName) itemUpdates.departmentName = sanitizedUpdates.departmentName;
-            if (sanitizedUpdates.designationTitle) itemUpdates.designationTitle = sanitizedUpdates.designationTitle;
-            if (Object.keys(itemUpdates).length > 0) {
-              await setDoc(doc(db, 'payrollItems', iDoc.id), cleanFirestoreData(itemUpdates), { merge: true });
+            if (sanitizedUpdates.departmentName) userUpdates.departmentName = sanitizedUpdates.departmentName;
+            if (sanitizedUpdates.avatarUrl) userUpdates.avatarUrl = sanitizedUpdates.avatarUrl;
+            await setDoc(doc(db, 'users', uDoc.id), cleanFirestoreData(userUpdates), { merge: true });
+          }
+        } catch (userSyncErr) {
+          console.warn('User doc sync warning:', userSyncErr);
+        }
+
+        // Synchronize open/draft payroll items with updated employee details
+        try {
+          const itemQuery = query(collection(db, 'payrollItems'), where('employeeId', '==', id));
+          const itemSnap = await getDocs(itemQuery);
+          for (const iDoc of itemSnap.docs) {
+            const itemData = iDoc.data();
+            if (itemData.status === 'draft' || itemData.status === 'pending') {
+              const itemUpdates: Record<string, any> = {};
+              if (sanitizedUpdates.firstName || sanitizedUpdates.lastName) {
+                itemUpdates.employeeName = `${sanitizedUpdates.firstName || ''} ${sanitizedUpdates.lastName || ''}`.trim();
+              }
+              if (sanitizedUpdates.panNumber) itemUpdates.panNumber = sanitizedUpdates.panNumber;
+              if (sanitizedUpdates.bankDetails) {
+                itemUpdates.bankName = sanitizedUpdates.bankDetails.bankName;
+                itemUpdates.bankAccountNumber = sanitizedUpdates.bankDetails.accountNumber;
+                itemUpdates.ifscCode = sanitizedUpdates.bankDetails.ifscCode;
+              }
+              if (sanitizedUpdates.departmentName) itemUpdates.departmentName = sanitizedUpdates.departmentName;
+              if (sanitizedUpdates.designationTitle) itemUpdates.designationTitle = sanitizedUpdates.designationTitle;
+              if (Object.keys(itemUpdates).length > 0) {
+                await setDoc(doc(db, 'payrollItems', iDoc.id), cleanFirestoreData(itemUpdates), { merge: true });
+              }
             }
           }
+        } catch (itemSyncErr) {
+          console.warn('Payroll item sync warning:', itemSyncErr);
         }
-      } catch (itemSyncErr) {
-        console.warn('Payroll item sync warning:', itemSyncErr);
+      } catch (err: any) {
+        console.error('Firestore updateEmployee error:', err.message);
       }
+    }
 
+    if (serverSuccess) {
       if (typeof window !== 'undefined') {
         window.dispatchEvent(
           new CustomEvent('coralgenz_store_updated', {
@@ -299,10 +322,8 @@ export class EmployeeService {
         );
       }
       return true;
-    } catch (err: any) {
-      console.error('Firestore updateEmployee error:', err.message);
-      return false;
     }
+    return false;
   }
 
   /**
