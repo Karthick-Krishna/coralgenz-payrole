@@ -1159,10 +1159,10 @@ export function EmployeeProfile({
           <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-3">
             <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-semibold text-sm mb-1">Permanent Data Deletion</p>
+              <p className="font-semibold text-sm mb-1">Permanent Data & Record Cascading Removal</p>
               <p>
                 You are about to permanently remove <strong>{employee.firstName} {employee.lastName}</strong> ({employee.id}) from the database server.
-                This action will delete their employee record, authentication user, leave balance, and credentials from Google Cloud Firestore.
+                This action will automatically erase their employee record, authentication user, attendance records, leave applications, generated payslips, and payroll records from Google Cloud Firestore.
               </p>
             </div>
           </div>

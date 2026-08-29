@@ -1,6 +1,17 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, deleteDoc, query } from 'firebase/firestore';
+import {
+  collection,
+  doc,
+  getDocs,
+  getDoc,
+  setDoc,
+  updateDoc,
+  deleteDoc,
+  query,
+  where,
+} from 'firebase/firestore';
 import { db, auth, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
+import { AuditService } from './audit-service';
 import { Employee, UserRole } from '@/types';
 
 export interface AddEmployeeOptions {
@@ -115,57 +126,237 @@ export class EmployeeService {
   }
 
   /**
-   * Update an existing employee in Firestore
+   * Update an existing employee in Firestore with full server persistence & synced caches
    */
-  public static async updateEmployee(id: string, updates: Partial<Employee> | Record<string, any>): Promise<boolean> {
+  public static async updateEmployee(
+    id: string,
+    updates: Partial<Employee> | Record<string, any>
+  ): Promise<boolean> {
     if (!id || !isFirebaseConfigured || !db) return false;
-    
+
     const sanitizedUpdates = cleanFirestoreData(updates);
 
     try {
       const docRef = doc(db, this.collectionName, id);
-      // Use updateDoc instead of setDoc with merge to ensure it only updates existing docs safely
-      await updateDoc(docRef, {
+      const updatePayload = {
         ...sanitizedUpdates,
+        id,
         updatedAt: new Date().toISOString(),
-      });
+      };
+
+      // 1. Atomically save updates to Firestore with merge
+      await setDoc(docRef, updatePayload, { merge: true });
+
+      // 2. Synchronize user profile in 'users' collection if names, email, role, or avatar changed
+      try {
+        const userQuery = query(collection(db, 'users'), where('employeeId', '==', id));
+        const userSnap = await getDocs(userQuery);
+        for (const uDoc of userSnap.docs) {
+          const userUpdates: Record<string, any> = { updatedAt: new Date().toISOString() };
+          if (sanitizedUpdates.firstName || sanitizedUpdates.lastName) {
+            userUpdates.displayName = `${sanitizedUpdates.firstName || ''} ${sanitizedUpdates.lastName || ''}`.trim();
+          }
+          if (sanitizedUpdates.email) userUpdates.email = sanitizedUpdates.email;
+          if (sanitizedUpdates.portalRole || sanitizedUpdates.role) {
+            userUpdates.role = sanitizedUpdates.portalRole || sanitizedUpdates.role;
+          }
+          if (sanitizedUpdates.departmentName) userUpdates.departmentName = sanitizedUpdates.departmentName;
+          if (sanitizedUpdates.avatarUrl) userUpdates.avatarUrl = sanitizedUpdates.avatarUrl;
+          await setDoc(doc(db, 'users', uDoc.id), cleanFirestoreData(userUpdates), { merge: true });
+        }
+      } catch (userSyncErr) {
+        console.warn('User doc sync warning:', userSyncErr);
+      }
+
+      // 3. Synchronize open/draft payroll items with updated employee details
+      try {
+        const itemQuery = query(collection(db, 'payrollItems'), where('employeeId', '==', id));
+        const itemSnap = await getDocs(itemQuery);
+        for (const iDoc of itemSnap.docs) {
+          const itemData = iDoc.data();
+          if (itemData.status === 'draft' || itemData.status === 'pending') {
+            const itemUpdates: Record<string, any> = {};
+            if (sanitizedUpdates.firstName || sanitizedUpdates.lastName) {
+              itemUpdates.employeeName = `${sanitizedUpdates.firstName || ''} ${sanitizedUpdates.lastName || ''}`.trim();
+            }
+            if (sanitizedUpdates.panNumber) itemUpdates.panNumber = sanitizedUpdates.panNumber;
+            if (sanitizedUpdates.bankDetails) {
+              itemUpdates.bankName = sanitizedUpdates.bankDetails.bankName;
+              itemUpdates.bankAccountNumber = sanitizedUpdates.bankDetails.accountNumber;
+              itemUpdates.ifscCode = sanitizedUpdates.bankDetails.ifscCode;
+            }
+            if (sanitizedUpdates.departmentName) itemUpdates.departmentName = sanitizedUpdates.departmentName;
+            if (sanitizedUpdates.designationTitle) itemUpdates.designationTitle = sanitizedUpdates.designationTitle;
+            if (Object.keys(itemUpdates).length > 0) {
+              await setDoc(doc(db, 'payrollItems', iDoc.id), cleanFirestoreData(itemUpdates), { merge: true });
+            }
+          }
+        }
+      } catch (itemSyncErr) {
+        console.warn('Payroll item sync warning:', itemSyncErr);
+      }
 
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
+        window.dispatchEvent(
+          new CustomEvent('coralgenz_store_updated', {
+            detail: { id, updates: sanitizedUpdates },
+          })
+        );
       }
       return true;
     } catch (err: any) {
       console.error('Firestore updateEmployee error:', err.message);
-      
-      // Fallback to setDoc if updateDoc fails due to non-existent document
-      if (err.code === 'not-found') {
-        try {
-          await setDoc(doc(db, this.collectionName, id), {
-            ...sanitizedUpdates,
-            updatedAt: new Date().toISOString(),
-          }, { merge: true });
-          
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
-          }
-          return true;
-        } catch (setErr) {
-          console.error('Firestore setDoc fallback error:', setErr);
-        }
-      }
       return false;
     }
   }
 
   /**
-   * Permanently delete an employee from Firestore
+   * Permanently delete an employee and cascade-delete all related payroll items,
+   * payslips, attendance records, leave balances, requests, and credentials from the server.
    */
   public static async deleteEmployee(id: string): Promise<boolean> {
     if (!id || !isFirebaseConfigured || !db) return false;
 
     try {
+      // 1. Delete Employee document from 'employees' collection
       await deleteDoc(doc(db, this.collectionName, id));
-      
+
+      // 2. Cascade delete all Payslips for this employee
+      try {
+        const payslipsQuery = query(collection(db, 'payslips'), where('employeeId', '==', id));
+        const payslipsSnap = await getDocs(payslipsQuery);
+        for (const pDoc of payslipsSnap.docs) {
+          await deleteDoc(doc(db, 'payslips', pDoc.id));
+        }
+      } catch (pErr) {
+        console.warn('Cascade delete payslips warning:', pErr);
+      }
+
+      // 3. Cascade delete all Payroll Items for this employee
+      const affectedRunIds = new Set<string>();
+      try {
+        const itemsQuery = query(collection(db, 'payrollItems'), where('employeeId', '==', id));
+        const itemsSnap = await getDocs(itemsQuery);
+        for (const iDoc of itemsSnap.docs) {
+          const itemData = iDoc.data();
+          if (itemData.payrollRunId) affectedRunIds.add(itemData.payrollRunId);
+          if (itemData.runId) affectedRunIds.add(itemData.runId);
+          await deleteDoc(doc(db, 'payrollItems', iDoc.id));
+        }
+      } catch (iErr) {
+        console.warn('Cascade delete payrollItems warning:', iErr);
+      }
+
+      // 4. Update or clean up affected Payroll Runs
+      for (const runId of Array.from(affectedRunIds)) {
+        try {
+          const remainingItemsQuery = query(collection(db, 'payrollItems'), where('payrollRunId', '==', runId));
+          const remainingItemsSnap = await getDocs(remainingItemsQuery);
+          
+          if (remainingItemsSnap.empty) {
+            // No more employees in this run -> delete the empty run
+            await deleteDoc(doc(db, 'payrollRuns', runId));
+          } else {
+            // Recalculate run totals without the deleted employee
+            let totalGross = 0;
+            let totalNet = 0;
+            let totalDeductions = 0;
+            remainingItemsSnap.forEach((d) => {
+              const dData = d.data();
+              totalGross += Number(dData.grossSalary) || 0;
+              totalNet += Number(dData.netSalary) || 0;
+              totalDeductions += Number(dData.totalDeductions) || 0;
+            });
+            await setDoc(
+              doc(db, 'payrollRuns', runId),
+              {
+                totalEmployees: remainingItemsSnap.size,
+                totalGrossPayroll: totalGross,
+                totalDeductions: totalDeductions,
+                totalNetPayroll: totalNet,
+                updatedAt: new Date().toISOString(),
+              },
+              { merge: true }
+            );
+          }
+        } catch (rErr) {
+          console.warn(`Payroll run recalculation warning for ${runId}:`, rErr);
+        }
+      }
+
+      // 5. Cascade delete all Attendance records for this employee
+      try {
+        const attendanceQuery = query(collection(db, 'attendance'), where('employeeId', '==', id));
+        const attendanceSnap = await getDocs(attendanceQuery);
+        for (const aDoc of attendanceSnap.docs) {
+          await deleteDoc(doc(db, 'attendance', aDoc.id));
+        }
+      } catch (aErr) {
+        console.warn('Cascade delete attendance warning:', aErr);
+      }
+
+      // 6. Cascade delete all Leave Requests & Leave Balances
+      try {
+        const leaveQuery = query(collection(db, 'leaveRequests'), where('employeeId', '==', id));
+        const leaveSnap = await getDocs(leaveQuery);
+        for (const lDoc of leaveSnap.docs) {
+          await deleteDoc(doc(db, 'leaveRequests', lDoc.id));
+        }
+        try {
+          await deleteDoc(doc(db, 'leaveBalances', id));
+          await deleteDoc(doc(db, 'leaveBalances', `lb-${id}`));
+        } catch {}
+      } catch (lErr) {
+        console.warn('Cascade delete leaves warning:', lErr);
+      }
+
+      // 7. Cascade delete all General Requests
+      try {
+        const reqQuery = query(collection(db, 'requests'), where('employeeId', '==', id));
+        const reqSnap = await getDocs(reqQuery);
+        for (const rDoc of reqSnap.docs) {
+          await deleteDoc(doc(db, 'requests', rDoc.id));
+        }
+      } catch (rErr) {
+        console.warn('Cascade delete requests warning:', rErr);
+      }
+
+      // 8. Cascade delete Notifications
+      try {
+        const notifQuery = query(collection(db, 'notifications'), where('userId', '==', id));
+        const notifSnap = await getDocs(notifQuery);
+        for (const nDoc of notifSnap.docs) {
+          await deleteDoc(doc(db, 'notifications', nDoc.id));
+        }
+      } catch (nErr) {
+        console.warn('Cascade delete notifications warning:', nErr);
+      }
+
+      // 9. Cascade delete User login mapping
+      try {
+        const userQuery = query(collection(db, 'users'), where('employeeId', '==', id));
+        const userSnap = await getDocs(userQuery);
+        for (const uDoc of userSnap.docs) {
+          await deleteDoc(doc(db, 'users', uDoc.id));
+        }
+      } catch (uErr) {
+        console.warn('Cascade delete user doc warning:', uErr);
+      }
+
+      // 10. Audit Trail
+      try {
+        await AuditService.logAction({
+          action: 'EMPLOYEE_DELETED',
+          module: 'employees',
+          details: `Cascaded permanent deletion for employee ${id} and all related payslips, payroll items, attendance, leaves, and records.`,
+          userId: 'usr-superadmin-01',
+          userName: 'Super Admin',
+          userRole: 'super_admin',
+          recordId: id,
+          recordTitle: `Employee ${id}`,
+        });
+      } catch {}
+
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { deletedId: id } }));
       }

@@ -44,9 +44,10 @@ function EmployeeDetailContent() {
 
   useEffect(() => {
     loadData();
-    window.addEventListener("coralgenz_store_updated", loadData);
-    return () => window.removeEventListener("coralgenz_store_updated", loadData);
-  }, [id]);
+    const handleStoreUpdate = () => loadData();
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
+  }, [id, isEditingParam]);
 
   if (isLoading) {
     return (
@@ -76,12 +77,19 @@ function EmployeeDetailContent() {
   if (isEditingParam) {
     return (
       <EmployeeForm
-        key={`edit-${employee.id}`}
+        key={`edit-${employee.id}-${employee.updatedAt || ''}`}
         initialData={employee}
         departments={departments}
         designations={designations}
         allEmployees={allEmployees}
         isEditing={true}
+        onSaved={async (savedEmp) => {
+          if (savedEmp) {
+            setEmployee(savedEmp);
+          }
+          await loadData();
+          router.replace(`/employees/${id}`);
+        }}
       />
     );
   }

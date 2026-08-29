@@ -37,6 +37,7 @@ interface EmployeeFormProps {
   designations: Designation[];
   allEmployees: Employee[];
   isEditing?: boolean;
+  onSaved?: (emp?: Employee) => void;
 }
 
 export function EmployeeForm({
@@ -45,6 +46,7 @@ export function EmployeeForm({
   designations,
   allEmployees,
   isEditing = false,
+  onSaved,
 }: EmployeeFormProps) {
   const router = useRouter();
   const { isSuperAdmin, currentRole, user } = useAuth();
@@ -319,7 +321,29 @@ export function EmployeeForm({
           "Profile & Credentials Updated!",
           `Saved server changes for ${formData.firstName} ${formData.lastName}. Updated all records and authentication credentials!`
         );
-        router.push(`/employees/${initialData.id}`);
+
+        if (onSaved) {
+          const updatedEmpObj: Employee = {
+            ...initialData,
+            ...payload,
+            personalEmail: formData.personalEmail.trim() || undefined,
+            phone: formData.phone.trim() || initialData.phone,
+            avatarUrl: formData.avatarUrl.trim() || undefined,
+            panNumber: formData.panNumber.trim().toUpperCase() || undefined,
+            address: formData.address.trim() || initialData.address,
+            city: formData.city.trim() || initialData.city,
+            state: formData.state.trim() || initialData.state,
+            country: formData.country.trim() || initialData.country,
+            postalCode: formData.postalCode.trim() || undefined,
+            managerId: formData.managerId || undefined,
+            managerName: selectedManager ? `${selectedManager.firstName} ${selectedManager.lastName}` : undefined,
+            id: initialData.id,
+            updatedAt: new Date().toISOString(),
+          };
+          onSaved(updatedEmpObj);
+        } else {
+          router.push(`/employees/${initialData.id}`);
+        }
       } else {
         // 1. Save Employee and Provision Login Account directly via Server API
         const newEmp = await EmployeeService.addEmployee(payload, {
