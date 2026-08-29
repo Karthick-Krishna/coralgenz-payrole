@@ -1,6 +1,7 @@
-import { collection, doc, getDocs, getDoc, setDoc, query, where, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, query, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
+import { AuditService } from './audit-service';
 import { PayrollRun, PayrollItem, Payslip, Employee } from '@/types';
 import { EmployeeService } from './employee-service';
 
@@ -68,58 +69,66 @@ export class PayrollService {
       let totalDeductions = 0;
       let totalTaxes = 0;
 
-      const items: PayrollItem[] = activeEmployees.map((emp, idx) => {
-        const gross = emp.currentMonthlyGross || 0;
-        const basic = Math.round(gross * 0.4);
-        const hra = Math.round(gross * 0.2);
-        const specialAllowance = gross - basic - hra;
+      const payrollItems: PayrollItem[] = activeEmployees.map((emp, index) => {
+        const monthlyGross = emp.currentMonthlyGross || 0;
         
-        const pf = Math.round(basic * 0.12);
-        const tax = Math.round(gross * 0.05);
-        const deductions = pf + tax;
+        // India statutory payroll math
+        const basic = Math.round(monthlyGross * 0.50);
+        const hra = Math.round(monthlyGross * 0.25);
+        const conveyance = 1600;
+        const medical = 1250;
+        const special = Math.max(0, monthlyGross - (basic + hra + conveyance + medical));
         
-        const net = gross - deductions;
+        // Deductions
+        const pf = Math.round(Math.min(basic, 15000) * 0.12);
+        const pt = monthlyGross > 15000 ? 200 : 0;
+        const tds = Math.round(monthlyGross * 0.05); // Standard 5% estimate
+        const deductions = pf + pt + tds;
+        const net = monthlyGross - deductions;
 
-        totalGross += gross;
+        totalGross += monthlyGross;
         totalNet += net;
         totalDeductions += deductions;
-        totalTaxes += tax;
+        totalTaxes += (pt + tds);
 
-        const defaultRefNo = `CGG-PS-${params.year}-${String(params.month).padStart(2, "0")}-${String(idx + 1).padStart(4, "0")}`;
+        const defaultPayslipNumber = `CGG-PS-${params.year}-${String(params.month).padStart(2, '0')}-${String(index + 1).padStart(4, '0')}`;
 
-        return cleanFirestoreData({
+        return {
           id: `pi-${runId}-${emp.id}`,
           payrollRunId: runId,
-          organizationId: emp.organizationId || 'org-1',
+          runId: runId,
+          organizationId: emp.organizationId || 'org-coralgenz-01',
           employeeId: emp.id,
           employeeName: `${emp.firstName} ${emp.lastName}`,
           employeeCode: emp.id,
-          departmentName: emp.departmentName || '',
-          designationTitle: emp.designationTitle || '',
+          departmentId: emp.departmentId,
+          departmentName: emp.departmentName || 'General',
+          designationId: emp.designationId,
+          designationTitle: emp.designationTitle || 'Associate',
           panNumber: emp.panNumber || emp.bankDetails?.panNumber || '',
-          payslipNumber: defaultRefNo,
-          refNo: defaultRefNo,
-          bankAccountNumber: emp.bankDetails?.accountNumber || '',
-          bankName: emp.bankDetails?.bankName || '',
-          ifscCode: emp.bankDetails?.ifscCode || '',
+          payslipNumber: defaultPayslipNumber,
+          refNo: defaultPayslipNumber,
+          
           totalWorkingDays: 30,
           daysPresent: 30,
           daysOnLeave: 0,
           daysLossOfPay: 0,
-          overtimeHours: 0,
+          
           basicSalary: basic,
           hra: hra,
-          conveyanceAllowance: 0,
-          medicalAllowance: 0,
-          specialAllowance: specialAllowance,
+          conveyanceAllowance: conveyance,
+          medicalAllowance: medical,
+          specialAllowance: special,
           performanceBonus: 0,
+          overtimeHours: 0,
           overtimePay: 0,
           otherEarnings: 0,
-          grossSalary: gross,
+          grossSalary: monthlyGross,
+          
           providentFund: pf,
           esi: 0,
-          professionalTax: 0,
-          incomeTaxTDS: tax,
+          professionalTax: pt,
+          incomeTaxTDS: tds,
           lossOfPayDeduction: 0,
           loanDeduction: 0,
           advanceDeduction: 0,
@@ -128,44 +137,45 @@ export class PayrollService {
           employerPf: pf,
           employerEsi: 0,
           netSalary: net,
+          
+          bankName: emp.bankDetails?.bankName || '',
+          bankAccountNumber: emp.bankDetails?.accountNumber || '',
+          ifscCode: emp.bankDetails?.ifscCode || '',
+          paymentMethod: 'bank_transfer',
+          paymentStatus: 'pending',
           status: 'calculated'
-        }) as PayrollItem;
+        };
       });
 
-      const run = cleanFirestoreData({
+      const newRun: PayrollRun = {
         id: runId,
-        organizationId: activeEmployees[0]?.organizationId || 'org-1',
+        organizationId: 'org-coralgenz-01',
+        periodName: params.periodName || `${params.month}/${params.year}`,
         month: params.month,
         year: params.year,
-        periodName: params.periodName || `${params.month}/${params.year}`,
-        startDate: params.startDate || new Date(params.year, params.month - 1, 1).toISOString(),
-        endDate: params.endDate || new Date(params.year, params.month, 0).toISOString(),
-        paymentDate: params.paymentDate || new Date(params.year, params.month, 5).toISOString(),
-        status: 'draft',
+        startDate: params.startDate || `${params.year}-${String(params.month).padStart(2, '0')}-01`,
+        endDate: params.endDate || `${params.year}-${String(params.month).padStart(2, '0')}-28`,
+        paymentDate: params.paymentDate || `${params.year}-${String(params.month).padStart(2, '0')}-28`,
         totalEmployees: activeEmployees.length,
         totalGrossPayroll: totalGross,
         totalNetPayroll: totalNet,
         totalDeductions: totalDeductions,
-        totalPfContribution: totalDeductions - totalTaxes, // Approximation
+        totalPfContribution: Math.max(0, totalDeductions - totalTaxes),
         totalEsiContribution: 0,
         totalTdsDeduction: totalTaxes,
-        processedCount: items.length,
-        approvedBy: '',
-        processedBy: params.processedBy || 'system',
-        processedByName: params.processedByName || 'System',
+        processedCount: payrollItems.length,
+        status: 'draft',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString()
-      }) as PayrollRun;
+      };
 
-      // Save Draft Run
-      await setDoc(doc(db, 'payrollRuns', runId), run);
-      
-      // Save Draft Items
-      for (const item of items) {
-        await setDoc(doc(db, 'payrollItems', item.id), item);
+      // Save draft run and draft items to Firestore
+      await setDoc(doc(db, 'payrollRuns', runId), cleanFirestoreData(newRun));
+      for (const item of payrollItems) {
+        await setDoc(doc(db, 'payrollItems', item.id), cleanFirestoreData(item));
       }
 
-      return { success: true, run, items };
+      return { success: true, run: newRun, items: payrollItems };
     } catch (err: any) {
       console.error('Firestore processPayroll error:', err.message);
       return { success: false, error: err.message };
@@ -257,9 +267,10 @@ export class PayrollService {
             pf: Number(item.providentFund) || 0,
             esi: Number(item.esi) || 0,
             professionalTax: Number(item.professionalTax) || 0,
-            tds: Number(item.incomeTaxTDS) || 0,
             incomeTax: Number(item.incomeTaxTDS) || 0,
             lossOfPay: Number(item.lossOfPayDeduction) || 0,
+            loan: 0,
+            advance: 0,
             other: Number(item.otherDeductions) || 0
           },
           
@@ -267,8 +278,14 @@ export class PayrollService {
           totalDeductions: Number(item.totalDeductions) || 0,
           netSalary: Number(item.netSalary) || 0,
           
-          status: 'published',
-          generatedAt: new Date().toISOString()
+          status: 'locked',
+          locked: true,
+          lockedAt: new Date().toISOString(),
+          lockedBy: params.approvedBy || 'usr-superadmin-01',
+          lockedByName: params.approvedByName || 'Super Admin',
+          generatedAt: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
         }) as Payslip;
 
         await setDoc(doc(db, 'payslips', payslip.id), payslip);
@@ -293,6 +310,20 @@ export class PayrollService {
         totalNetPayroll: totalNet,
         totalDeductions: totalDeductions,
       };
+
+      // 5. Audit Log
+      try {
+        await AuditService.logAction({
+          action: 'PAYROLL_LOCKED',
+          module: 'payroll',
+          details: `Locked & published payroll for ${run.periodName} (${payslips.length} payslips dispatched). Total Net: ₹${totalNet.toLocaleString('en-IN')}`,
+          userId: params.approvedBy || 'usr-superadmin-01',
+          userName: params.approvedByName || 'Super Admin',
+          userRole: 'super_admin',
+          recordId: params.runId,
+          recordTitle: `Payroll ${run.periodName}`,
+        });
+      } catch {}
 
       return { success: true, run: updatedRun, payslips };
     } catch (err: any) {
@@ -331,5 +362,192 @@ export class PayrollService {
       console.error('Firestore getPayslipById error:', error.message);
     }
     return null;
+  }
+
+  /**
+   * Lock a single payslip with audit trail
+   */
+  public static async lockPayslip(
+    id: string,
+    adminUser: { id: string; name: string; role?: string }
+  ): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+    try {
+      const docRef = doc(db, 'payslips', id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return false;
+      const data = snap.data() as Payslip;
+
+      const updates = {
+        status: 'locked',
+        locked: true,
+        lockedAt: new Date().toISOString(),
+        lockedBy: adminUser.id,
+        lockedByName: adminUser.name,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateDoc(docRef, cleanFirestoreData(updates));
+
+      await AuditService.logAction({
+        action: 'PAYSLIP_LOCKED',
+        module: 'payroll',
+        details: `Locked payslip ${data.payslipNumber || id} for employee ${data.employeeName} (${data.employeeId})`,
+        userId: adminUser.id,
+        userName: adminUser.name,
+        userRole: adminUser.role || 'admin',
+        recordId: id,
+        recordTitle: `Payslip ${data.payslipNumber || id}`,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Firestore lockPayslip error:', err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Unlock a single payslip with audit trail & reason
+   */
+  public static async unlockPayslip(
+    id: string,
+    adminUser: { id: string; name: string; role?: string },
+    reason: string
+  ): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+    try {
+      const docRef = doc(db, 'payslips', id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return false;
+      const data = snap.data() as Payslip;
+
+      const updates = {
+        status: 'published',
+        locked: false,
+        unlockedAt: new Date().toISOString(),
+        unlockedBy: adminUser.id,
+        unlockedByName: adminUser.name,
+        unlockReason: reason,
+        updatedAt: new Date().toISOString(),
+      };
+      await updateDoc(docRef, cleanFirestoreData(updates));
+
+      await AuditService.logAction({
+        action: 'PAYSLIP_UNLOCKED',
+        module: 'payroll',
+        details: `Unlocked payslip ${data.payslipNumber || id} for employee ${data.employeeName} (${data.employeeId}). Reason: ${reason}`,
+        userId: adminUser.id,
+        userName: adminUser.name,
+        userRole: adminUser.role || 'admin',
+        recordId: id,
+        recordTitle: `Payslip ${data.payslipNumber || id}`,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Firestore unlockPayslip error:', err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Admin Override: Edit a locked payslip with required audit reason & recalculated totals
+   */
+  public static async updateLockedPayslip(
+    id: string,
+    updates: Partial<Payslip>,
+    adminUser: { id: string; name: string; role?: string },
+    reason: string
+  ): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+    try {
+      const docRef = doc(db, 'payslips', id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return false;
+      const oldData = snap.data() as Payslip;
+
+      const mergedPayload = cleanFirestoreData({
+        ...oldData,
+        ...updates,
+        updatedAt: new Date().toISOString(),
+        lastModifiedBy: adminUser.id,
+        lastModifiedByName: adminUser.name,
+        lastOverrideReason: reason,
+      });
+
+      await setDoc(docRef, mergedPayload, { merge: true });
+
+      // Record detailed Audit Log for administrative override
+      await AuditService.logAction({
+        action: 'LOCKED_PAYSLIP_EDITED',
+        module: 'payroll',
+        details: `Administrative override edit on locked payslip ${oldData.payslipNumber || id} for ${oldData.employeeName}. Reason: ${reason}`,
+        userId: adminUser.id,
+        userName: adminUser.name,
+        userRole: adminUser.role || 'admin',
+        recordId: id,
+        recordTitle: `Payslip ${oldData.payslipNumber || id}`,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Firestore updateLockedPayslip error:', err.message);
+      return false;
+    }
+  }
+
+  /**
+   * Admin Delete: Delete a payslip (even if locked) with required audit reason
+   */
+  public static async deletePayslip(
+    id: string,
+    adminUser: { id: string; name: string; role?: string },
+    reason: string
+  ): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+    try {
+      const docRef = doc(db, 'payslips', id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return false;
+      const data = snap.data() as Payslip;
+
+      await deleteDoc(docRef);
+
+      // Also clean up or void associated payroll item if present
+      try {
+        const itemSnap = await getDocs(query(collection(db, 'payrollItems'), where('employeeId', '==', data.employeeId), where('payrollRunId', '==', data.payrollRunId)));
+        for (const iDoc of itemSnap.docs) {
+          await deleteDoc(doc(db, 'payrollItems', iDoc.id));
+        }
+      } catch {}
+
+      await AuditService.logAction({
+        action: 'LOCKED_PAYSLIP_DELETED',
+        module: 'payroll',
+        details: `Admin deleted payslip ${data.payslipNumber || id} for ${data.employeeName} (${data.employeeId}). Reason: ${reason}`,
+        userId: adminUser.id,
+        userName: adminUser.name,
+        userRole: adminUser.role || 'admin',
+        recordId: id,
+        recordTitle: `Payslip ${data.payslipNumber || id}`,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Firestore deletePayslip error:', err.message);
+      return false;
+    }
   }
 }

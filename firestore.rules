@@ -2,8 +2,137 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    match /{document=**} {
-      allow read, write: if true;
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isSuperAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role == 'super_admin' ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'super_admin'
+      );
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.role in ['super_admin', 'admin', 'hr_admin'] ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['super_admin', 'admin', 'hr_admin']
+      );
+    }
+
+    function isOwner(employeeId) {
+      return isAuthenticated() && (
+        request.auth.uid == employeeId ||
+        request.auth.token.employeeId == employeeId ||
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.employeeId == employeeId
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow delete: if isSuperAdmin();
+    }
+
+    // Employees Collection
+    match /employees/{employeeId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isSuperAdmin() || isAdmin();
+    }
+
+    // Payslips Collection
+    match /payslips/{payslipId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.employeeId == request.auth.uid || isOwner(resource.data.employeeId));
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Payroll Runs & Items Collection
+    match /payrollRuns/{runId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /payrollItems/{itemId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.employeeId == request.auth.uid || isOwner(resource.data.employeeId));
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Attendance Collection
+    match /attendance/{attendanceId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.employeeId == request.auth.uid || isOwner(resource.data.employeeId));
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.employeeId == request.auth.uid || isOwner(request.resource.data.employeeId));
+      allow update, delete: if isAdmin();
+    }
+
+    // Leave Requests Collection
+    match /leaveRequests/{leaveId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.employeeId == request.auth.uid || isOwner(resource.data.employeeId));
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.employeeId == request.auth.uid || isOwner(request.resource.data.employeeId));
+      allow update, delete: if isAdmin();
+    }
+
+    match /leaveBalances/{balanceId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.employeeId == request.auth.uid || isOwner(resource.data.employeeId));
+      allow write: if isAdmin();
+    }
+
+    // Employee Requests
+    match /requests/{requestId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.employeeId == request.auth.uid || isOwner(resource.data.employeeId));
+      allow create: if isAuthenticated() && (isAdmin() || request.resource.data.employeeId == request.auth.uid || isOwner(request.resource.data.employeeId));
+      allow update, delete: if isAdmin();
+    }
+
+    // Announcements Collection
+    match /announcements/{announcementId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Holidays & Calendar Events
+    match /holidays/{holidayId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /calendarEvents/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Departments & Designations
+    match /departments/{deptId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /designations/{desigId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // Company Settings
+    match /companySettings/{settingId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Notifications
+    match /notifications/{notifId} {
+      allow read: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || isOwner(resource.data.userId));
+      allow create: if isAuthenticated();
+      allow update, delete: if isAuthenticated() && (isAdmin() || resource.data.userId == request.auth.uid || isOwner(resource.data.userId));
+    }
+
+    // Audit Logs - Strictly append-only for admins, read-only for admins, non-updatable
+    match /audit_logs/{logId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated();
+      allow update, delete: if false; // Immutable audit log
     }
   }
 }

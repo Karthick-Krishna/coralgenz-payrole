@@ -81,7 +81,7 @@ export class EmployeeService {
   }
 
   /**
-   * Add a new employee profile to Firestore and create an Auth account
+   * Add a new employee profile to Firestore with email uniqueness check and Auth account linking
    */
   public static async addEmployee(
     empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> | Record<string, any>,
@@ -94,7 +94,20 @@ export class EmployeeService {
     const sanitizedEmpData = cleanFirestoreData(empData);
 
     try {
-      // 1. Generate new Document ID
+      // 1. Email Uniqueness Validation
+      if (sanitizedEmpData.email) {
+        const cleanEmail = sanitizedEmpData.email.toLowerCase().trim();
+        const emailQuery = query(
+          collection(db, this.collectionName),
+          where('email', '==', cleanEmail)
+        );
+        const existingSnapshot = await getDocs(emailQuery);
+        if (!existingSnapshot.empty) {
+          throw new Error(`An employee with email "${cleanEmail}" already exists on the server.`);
+        }
+      }
+
+      // 2. Generate new Document ID
       let count = 0;
       try {
         const existingSnapshot = await getDocs(collection(db, this.collectionName));
@@ -104,15 +117,55 @@ export class EmployeeService {
       }
       const nextId = `CGG-EMP-${String(count + 1).padStart(4, '0')}`;
 
+      // 3. Provision or Link Firebase Auth account
+      let authUid = sanitizedEmpData.userId || sanitizedEmpData.uid || '';
+      try {
+        const provRes = await fetch('/api/auth/provision', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: sanitizedEmpData.email,
+            password: options?.portalPassword || 'Welcome@2026',
+            displayName: `${sanitizedEmpData.firstName || ''} ${sanitizedEmpData.lastName || ''}`.trim(),
+            role: options?.portalRole || sanitizedEmpData.role || 'employee',
+            employeeId: nextId,
+            phone: sanitizedEmpData.phone,
+            createdBy: options?.createdBy || 'Super Admin',
+          }),
+        });
+        const provData = await provRes.json();
+        if (provData?.user?.id || provData?.user?.uid) {
+          authUid = provData.user.id || provData.user.uid;
+        }
+      } catch (provErr) {
+        console.warn('Auth provision warning on addEmployee:', provErr);
+      }
+
       const newEmp: Employee = cleanFirestoreData({
         ...sanitizedEmpData,
         id: nextId,
+        uid: authUid || nextId,
+        userId: authUid || nextId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
 
-      // Save to Firestore
+      // 4. Save to Firestore
       await setDoc(doc(db, this.collectionName, nextId), newEmp);
+
+      // 5. Audit Log
+      try {
+        await AuditService.logAction({
+          action: 'EMPLOYEE_CREATED',
+          module: 'employees',
+          details: `Created new employee profile ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}, ${newEmp.email}) with ${newEmp.portalRole || newEmp.role || 'employee'} access`,
+          userId: options?.createdBy || 'usr-superadmin-01',
+          userName: options?.createdBy || 'Super Admin',
+          userRole: options?.creatorRole || 'super_admin',
+          recordId: nextId,
+          recordTitle: `${newEmp.firstName} ${newEmp.lastName}`,
+        });
+      } catch {}
 
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { employee: newEmp } }));
@@ -122,6 +175,48 @@ export class EmployeeService {
     } catch (err: any) {
       console.error('Firestore addEmployee error:', err.message);
       throw new Error(err.message || 'Failed to save employee to Firestore.');
+    }
+  }
+
+  /**
+   * Deactivate an employee (Normal HR operation: preserves historical records while disabling access)
+   */
+  public static async deactivateEmployee(
+    id: string,
+    adminUser: { id: string; name: string; role?: string }
+  ): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+    try {
+      const docRef = doc(db, this.collectionName, id);
+      const snap = await getDoc(docRef);
+      if (!snap.exists()) return false;
+      const emp = snap.data() as Employee;
+
+      await updateDoc(docRef, {
+        status: 'inactive',
+        updatedAt: new Date().toISOString(),
+        deactivatedAt: new Date().toISOString(),
+        deactivatedBy: adminUser.id,
+      });
+
+      await AuditService.logAction({
+        action: 'EMPLOYEE_DEACTIVATED',
+        module: 'employees',
+        details: `Deactivated employee ${emp.firstName} ${emp.lastName} (${id}). Historical payroll and attendance preserved.`,
+        userId: adminUser.id,
+        userName: adminUser.name,
+        userRole: adminUser.role || 'admin',
+        recordId: id,
+        recordTitle: `Employee ${id}`,
+      });
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { deactivatedId: id } }));
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Firestore deactivateEmployee error:', err.message);
+      return false;
     }
   }
 

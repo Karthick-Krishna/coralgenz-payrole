@@ -86,15 +86,37 @@ export function EmployeeProfile({
   const [showDocModal, setShowDocModal] = useState(false);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isDeactivating, setIsDeactivating] = useState(false);
+
+  const handleDeactivateEmployee = async () => {
+    setIsDeactivating(true);
+    try {
+      const res = await EmployeeService.deactivateEmployee(employee.id, {
+        id: "usr-superadmin-01",
+        name: "Super Admin",
+        role: currentRole,
+      });
+      if (res) {
+        success("Employee Deactivated", `${employee.firstName} ${employee.lastName} has been deactivated. Historical records and payslips are preserved.`);
+        setShowDeactivateModal(false);
+        if (onRefresh) onRefresh();
+      }
+    } catch (err: any) {
+      error("Deactivate Failed", err.message || "Failed to deactivate employee on server.");
+    } finally {
+      setIsDeactivating(false);
+    }
+  };
 
   const handleDeleteEmployee = async () => {
     setIsDeleting(true);
     try {
       const res = await EmployeeService.deleteEmployee(employee.id);
       if (res) {
-        success("Employee Removed", `Successfully removed ${employee.firstName} ${employee.lastName} from the database server.`);
+        success("Employee Removed", `Successfully removed ${employee.firstName} ${employee.lastName} and cascaded all associated records from the database server.`);
         router.push("/employees");
       }
     } catch (err: any) {
@@ -421,6 +443,17 @@ export function EmployeeProfile({
               >
                 Offboard
               </Button>
+              {employee.status === "active" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowDeactivateModal(true)}
+                  leftIcon={<UserMinus className="w-3.5 h-3.5 text-amber-500" />}
+                  className="text-xs text-amber-700 dark:text-amber-400 border-amber-200 dark:border-amber-800"
+                >
+                  Deactivate
+                </Button>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -433,7 +466,7 @@ export function EmployeeProfile({
               <Button
                 variant="coral"
                 size="sm"
-                onClick={() => router.push(`/employees/new?editId=${employee.id}`)}
+                onClick={() => router.push(`/employees/${employee.id}?edit=true`)}
                 leftIcon={<Edit className="w-3.5 h-3.5" />}
                 className="text-xs col-span-2 sm:col-span-1"
               >
@@ -1145,6 +1178,52 @@ export function EmployeeProfile({
             </Button>
           </div>
         </form>
+      </Modal>
+
+      {/* MODAL 5B: DEACTIVATE EMPLOYEE (PRESERVE HISTORY) */}
+      <Modal
+        isOpen={showDeactivateModal}
+        onClose={() => setShowDeactivateModal(false)}
+        title="Deactivate Employee"
+        description="Deactivating disables login access while safely preserving all historical payroll, payslips, and attendance."
+        maxWidth="md"
+      >
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-200 text-xs flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-semibold text-sm mb-1">Normal HR Archival Operation</p>
+              <p>
+                Deactivating <strong>{employee.firstName} {employee.lastName}</strong> will prevent portal login, but all historical payslips, tax archives, and audit records remain intact for company records.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
+            <p><span className="text-slate-400">Employee:</span> <span className="font-bold">{employee.firstName} {employee.lastName}</span></p>
+            <p><span className="text-slate-400">Status Change:</span> <span className="font-mono font-bold text-amber-600">ACTIVE &rarr; INACTIVE</span></p>
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowDeactivateModal(false)}
+              disabled={isDeactivating}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="coral"
+              size="sm"
+              onClick={handleDeactivateEmployee}
+              isLoading={isDeactivating}
+              leftIcon={<UserMinus className="w-4 h-4" />}
+            >
+              Confirm Deactivation
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       {/* MODAL 6: PERMANENT EMPLOYEE DELETION */}

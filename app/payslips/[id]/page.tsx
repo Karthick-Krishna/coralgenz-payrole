@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { PayslipViewer } from "@/components/payslips/payslip-viewer";
 import { PayrollService } from "@/lib/firebase/payroll-service";
+import { SettingsService } from "@/lib/firebase/settings-service";
 import { DEMO_ORGANIZATION } from "@/lib/demo/demo-data";
 import { Payslip, Organization } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -18,21 +19,28 @@ export default function PayslipDetailPage() {
   const [organization, setOrganization] = useState<Organization | null>(DEMO_ORGANIZATION);
   const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
+  const fetchPayslip = async () => {
     if (!id) return;
-    const fetchPayslip = async () => {
-      setIsLoading(true);
-      try {
-        const ps = await PayrollService.getPayslipById(id);
-        setPayslip(ps || null);
-        setOrganization(DEMO_ORGANIZATION);
-      } catch (err) {
-        console.error("Error fetching payslip:", err);
-      } finally {
-        setIsLoading(false);
-      }
-    };
+    setIsLoading(true);
+    try {
+      const [ps, org] = await Promise.all([
+        PayrollService.getPayslipById(id),
+        SettingsService.getSettings(),
+      ]);
+      setPayslip(ps || null);
+      setOrganization(org || DEMO_ORGANIZATION);
+    } catch (err) {
+      console.error("Error fetching payslip:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
     fetchPayslip();
+    const handleUpdate = () => fetchPayslip();
+    window.addEventListener("coralgenz_store_updated", handleUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleUpdate);
   }, [id]);
 
   if (isLoading) {
@@ -63,7 +71,7 @@ export default function PayslipDetailPage() {
 
   return (
     <AppLayout module="payslips">
-      <PayslipViewer payslip={payslip} organization={organization} />
+      <PayslipViewer payslip={payslip} organization={organization} onRefresh={fetchPayslip} />
     </AppLayout>
   );
 }

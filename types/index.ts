@@ -495,8 +495,18 @@ export interface Payslip {
   netSalary: number;
   netSalaryInWords: string;
 
-  status: 'draft' | 'published' | 'paid';
+  status: 'draft' | 'published' | 'paid' | 'locked';
+  locked?: boolean;
+  lockedAt?: string;
+  lockedBy?: string;
+  lockedByName?: string;
+  unlockReason?: string;
+  lastOverrideReason?: string;
+  lastModifiedBy?: string;
+  lastModifiedByName?: string;
   generatedAt: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface Holiday {
