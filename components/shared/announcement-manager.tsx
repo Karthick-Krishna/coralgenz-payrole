@@ -70,7 +70,7 @@ export function AnnouncementManager({ initialAnnouncements, onRefresh }: Announc
       priority,
       authorId: user?.id || "usr-superadmin-01",
       authorName: user?.displayName || "Super Admin",
-      authorRole: currentRole.replace("_", " ").toUpperCase(),
+      authorRole: (currentRole || "admin").replace("_", " ").toUpperCase(),
       isPinned,
     });
 

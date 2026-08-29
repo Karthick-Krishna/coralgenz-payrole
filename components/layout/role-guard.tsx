@@ -77,7 +77,7 @@ export function RoleGuard({
           Access Restricted
         </h2>
         <p className="text-sm text-slate-500 dark:text-slate-400 mt-1.5 max-w-md">
-          Your current role (<span className="font-semibold text-slate-700 dark:text-slate-300">{currentRole.replace("_", " ")}</span>) does not have sufficient permissions to view this module.
+          Your current role (<span className="font-semibold text-slate-700 dark:text-slate-300">{(currentRole || "employee").replace("_", " ")}</span>) does not have sufficient permissions to view this module.
         </p>
         <div className="mt-6 flex items-center gap-3">
           <Button variant="outline" size="sm" onClick={() => router.push("/dashboard")}>

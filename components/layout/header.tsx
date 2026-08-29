@@ -250,7 +250,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                 {user?.displayName || "User"}
               </p>
               <p className="text-[10px] text-slate-400 capitalize">
-                {currentRole.replace("_", " ")}
+                {(currentRole || "employee").replace("_", " ")}
               </p>
             </div>
           </button>
@@ -265,7 +265,7 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                   {user?.email}
                 </p>
                 <Badge variant="coral" size="sm" className="mt-1.5">
-                  {currentRole.replace("_", " ").toUpperCase()}
+                  {(currentRole || "employee").replace("_", " ").toUpperCase()}
                 </Badge>
               </div>
 

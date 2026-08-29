@@ -24,10 +24,26 @@ export class LeaveService {
         const balDoc = await getDoc(doc(db, this.balCollectionName, `lb-${employeeId}-2026`));
         if (balDoc.exists()) {
           balance = { ...balDoc.data(), id: balDoc.id } as LeaveBalance;
+        } else {
+          balance = {
+            id: `lb-${employeeId}-2026`,
+            organizationId: 'org-coralgenz-01',
+            employeeId,
+            year: 2026,
+            casual: { allocated: 12, used: 0, remaining: 12 },
+            sick: { allocated: 10, used: 0, remaining: 10 },
+            annual: { allocated: 15, used: 0, remaining: 15 },
+            earned: { allocated: 15, used: 0, remaining: 15 },
+            maternity: { allocated: 182, used: 0, remaining: 182 },
+            paternity: { allocated: 15, used: 0, remaining: 15 },
+            unpaid: { used: 0 },
+            updatedAt: new Date().toISOString(),
+          };
+          await setDoc(doc(db, this.balCollectionName, balance.id), cleanFirestoreData(balance));
         }
       }
 
-      return { requests, balance };
+      return { requests: requests.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()), balance };
     } catch (error: any) {
       console.error('Firestore getLeaves error:', error.message);
       return { requests: [], balance: null };
@@ -39,7 +55,13 @@ export class LeaveService {
 
     try {
       const id = req.id || `leave-${Date.now()}`;
-      const payload = cleanFirestoreData({ ...req, id });
+      const payload = cleanFirestoreData({
+        ...req,
+        id,
+        status: req.status || 'pending',
+        createdAt: req.createdAt || new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
       
       await setDoc(doc(db, this.reqCollectionName, id), payload, { merge: true });
       return true;
@@ -53,7 +75,7 @@ export class LeaveService {
     if (!requestId || !isFirebaseConfigured || !db) return false;
 
     try {
-      await updateDoc(doc(db, this.reqCollectionName, requestId), cleanFirestoreData({ status, approverNotes }));
+      await updateDoc(doc(db, this.reqCollectionName, requestId), cleanFirestoreData({ status, approverNotes, updatedAt: new Date().toISOString() }));
       return true;
     } catch (error: any) {
       console.error('Firestore updateLeaveStatus error:', error.message);

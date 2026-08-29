@@ -90,7 +90,7 @@ export default function ProfilePage() {
                 </h1>
                 <p className="text-xs text-slate-400">{user?.email}</p>
                 <Badge variant="coral" size="sm" className="capitalize">
-                  {currentRole.replace("_", " ")}
+                  {(currentRole || "employee").replace("_", " ")}
                 </Badge>
               </div>
             </div>

@@ -22,7 +22,7 @@ export default function UnauthorizedPage() {
             <div className="space-y-1">
               <h2 className="text-xl font-bold text-white">403 - Access Prohibited</h2>
               <p className="text-xs text-slate-400 max-w-xs mx-auto">
-                You do not have the necessary RBAC permissions for this resource under role: <span className="font-semibold text-white capitalize">{currentRole.replace("_", " ")}</span>.
+                You do not have the necessary RBAC permissions for this resource under role: <span className="font-semibold text-white capitalize">{(currentRole || "employee").replace("_", " ")}</span>.
               </p>
             </div>
 
