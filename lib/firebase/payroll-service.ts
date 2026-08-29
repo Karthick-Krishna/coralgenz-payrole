@@ -550,4 +550,71 @@ export class PayrollService {
       return false;
     }
   }
+
+  /**
+   * Delete a complete payroll cycle run with cascading deletion of its items, payslips, and audit logging
+   */
+  public static async deletePayrollRun(
+    runId: string,
+    adminUser?: { id: string; name: string; role?: string },
+    reason?: string
+  ): Promise<boolean> {
+    if (!runId || !isFirebaseConfigured || !db) return false;
+
+    try {
+      // 1. Get Run info for details
+      const runRef = doc(db, 'payrollRuns', runId);
+      const runSnap = await getDoc(runRef);
+      const periodName = runSnap.exists() ? (runSnap.data().periodName || runId) : runId;
+
+      // 2. Delete Payroll Run document
+      await deleteDoc(runRef);
+
+      // 3. Cascade delete associated payroll items
+      try {
+        const itemsSnap1 = await getDocs(query(collection(db, 'payrollItems'), where('payrollRunId', '==', runId)));
+        for (const d of itemsSnap1.docs) {
+          await deleteDoc(doc(db, 'payrollItems', d.id));
+        }
+        const itemsSnap2 = await getDocs(query(collection(db, 'payrollItems'), where('runId', '==', runId)));
+        for (const d of itemsSnap2.docs) {
+          await deleteDoc(doc(db, 'payrollItems', d.id));
+        }
+      } catch (err) {
+        console.warn('Items deletion warning:', err);
+      }
+
+      // 4. Cascade delete associated payslips
+      try {
+        const payslipsSnap = await getDocs(query(collection(db, 'payslips'), where('payrollRunId', '==', runId)));
+        for (const d of payslipsSnap.docs) {
+          await deleteDoc(doc(db, 'payslips', d.id));
+        }
+      } catch (err) {
+        console.warn('Payslips deletion warning:', err);
+      }
+
+      // 5. Create Audit Log
+      try {
+        await AuditService.logAction({
+          action: 'PAYROLL_RUN_DELETED',
+          module: 'payroll',
+          details: `Deleted historical payroll cycle ${periodName} (${runId}) and cascaded all associated line items and payslips. Reason: ${reason || 'Administrative removal'}`,
+          userId: adminUser?.id || 'usr-superadmin-01',
+          userName: adminUser?.name || 'Super Admin',
+          userRole: adminUser?.role || 'super_admin',
+          recordId: runId,
+          recordTitle: `Payroll Run ${periodName}`,
+        });
+      } catch {}
+
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+      }
+      return true;
+    } catch (err: any) {
+      console.error('Firestore deletePayrollRun error:', err.message);
+      return false;
+    }
+  }
 }
