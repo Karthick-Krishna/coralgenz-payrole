@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Holiday } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,18 +10,22 @@ import { Select } from "@/components/ui/select";
 import { Modal } from "@/components/ui/modal";
 import { formatDate } from "@/lib/utils";
 import { useToast } from "@/components/ui/toast";
+import { useAuth } from "@/lib/auth/auth-context";
 import {
   Calendar as CalendarIcon,
   Plus,
   Building,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 interface CalendarViewProps {
   initialHolidays: Holiday[];
+  onRefresh?: () => void;
 }
 
-export function CalendarView({ initialHolidays }: CalendarViewProps) {
+export function CalendarView({ initialHolidays, onRefresh }: CalendarViewProps) {
+  const { currentRole } = useAuth();
   const { success, error } = useToast();
   const [holidays, setHolidays] = useState<Holiday[]>(initialHolidays);
   const [showModal, setShowModal] = useState(false);
@@ -32,11 +35,21 @@ export function CalendarView({ initialHolidays }: CalendarViewProps) {
   const [type, setType] = useState<Holiday["type"]>("public");
   const [description, setDescription] = useState("");
 
-  const refreshData = () => {
-    setHolidays(MockDataStore.getHolidays());
+  useEffect(() => {
+    setHolidays(initialHolidays);
+  }, [initialHolidays]);
+
+  const refreshData = async () => {
+    try {
+      const res = await fetch("/api/holidays", { cache: "no-store" });
+      const data = await res.json();
+      if (data?.holidays) {
+        setHolidays(data.holidays);
+      }
+    } catch {}
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !date) {
       error("Missing Information", "Please enter holiday name and date.");
@@ -46,7 +59,7 @@ export function CalendarView({ initialHolidays }: CalendarViewProps) {
     const d = new Date(date);
     const dayOfWeek = d.toLocaleDateString("en-US", { weekday: "long" });
 
-    MockDataStore.addHoliday({
+    const payload = {
       organizationId: "org-coralgenz-01",
       name,
       date,
@@ -54,12 +67,49 @@ export function CalendarView({ initialHolidays }: CalendarViewProps) {
       type,
       isRecurringYearly: true,
       description,
-    });
+    };
 
-    success("Holiday Added", `Added ${name} to company calendar.`);
-    setShowModal(false);
-    setName("");
-    refreshData();
+    try {
+      const res = await fetch("/api/holidays", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.holiday) {
+        success("Holiday Added", `Added ${name} to company calendar on server.`);
+        setShowModal(false);
+        setName("");
+        setDescription("");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        refreshData();
+        onRefresh?.();
+      } else {
+        error("Error", data.error || "Failed to save holiday on server.");
+      }
+    } catch (err: any) {
+      error("Network Error", err.message || "Failed to save holiday.");
+    }
+  };
+
+  const handleDelete = async (id: string, holName: string) => {
+    if (!confirm(`Delete "${holName}" from company calendar?`)) return;
+    try {
+      const res = await fetch(`/api/holidays?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        success("Holiday Removed", `Removed ${holName} from server calendar.`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        refreshData();
+        onRefresh?.();
+      }
+    } catch {}
   };
 
   return (
@@ -75,14 +125,16 @@ export function CalendarView({ initialHolidays }: CalendarViewProps) {
           </p>
         </div>
 
-        <Button
-          variant="coral"
-          size="sm"
-          onClick={() => setShowModal(true)}
-          leftIcon={<Plus className="w-4 h-4" />}
-        >
-          Add Holiday
-        </Button>
+        {currentRole !== "employee" && (
+          <Button
+            variant="coral"
+            size="sm"
+            onClick={() => setShowModal(true)}
+            leftIcon={<Plus className="w-4 h-4" />}
+          >
+            Add Holiday
+          </Button>
+        )}
       </div>
 
       {/* Grid of Holidays */}
@@ -97,9 +149,21 @@ export function CalendarView({ initialHolidays }: CalendarViewProps) {
                 >
                   {hol.type.toUpperCase()}
                 </Badge>
-                <span className="text-xs text-slate-400 font-medium">
-                  {hol.dayOfWeek}
-                </span>
+                <div className="flex items-center gap-1">
+                  <span className="text-xs text-slate-400 font-medium">
+                    {hol.dayOfWeek}
+                  </span>
+                  {currentRole !== "employee" && (
+                    <button
+                      type="button"
+                      onClick={() => handleDelete(hol.id, hol.name)}
+                      className="text-slate-300 hover:text-red-500 p-0.5 ml-1 transition-colors"
+                      title="Delete Holiday"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
 
               <div className="space-y-1">
@@ -126,7 +190,7 @@ export function CalendarView({ initialHolidays }: CalendarViewProps) {
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title="Add Company Holiday"
-        description="Schedule a gazetted holiday or company event"
+        description="Schedule a gazetted holiday or company event on server"
       >
         <form onSubmit={handleSave} className="space-y-4">
           <Input

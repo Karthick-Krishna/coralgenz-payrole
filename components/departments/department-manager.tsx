@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Department, Employee } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,17 +16,20 @@ import {
   Users,
   CreditCard,
   Edit2,
+  Trash2,
   CheckCircle2,
 } from "lucide-react";
 
 interface DepartmentManagerProps {
   initialDepartments: Department[];
   employees: Employee[];
+  onRefresh?: () => void;
 }
 
 export function DepartmentManager({
   initialDepartments,
   employees,
+  onRefresh,
 }: DepartmentManagerProps) {
   const { success, error } = useToast();
   const [departments, setDepartments] = useState<Department[]>(initialDepartments);
@@ -40,8 +42,18 @@ export function DepartmentManager({
   const [headEmployeeId, setHeadEmployeeId] = useState("");
   const [colorHex, setColorHex] = useState("#ff5722");
 
-  const refreshData = () => {
-    setDepartments(MockDataStore.getDepartments());
+  useEffect(() => {
+    setDepartments(initialDepartments);
+  }, [initialDepartments]);
+
+  const refreshData = async () => {
+    try {
+      const res = await fetch("/api/departments", { cache: "no-store" });
+      const data = await res.json();
+      if (data?.departments) {
+        setDepartments(data.departments);
+      }
+    } catch {}
   };
 
   const handleOpenAdd = () => {
@@ -64,7 +76,7 @@ export function DepartmentManager({
     setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !code) {
       error("Missing Fields", "Please enter department name and short code.");
@@ -73,42 +85,61 @@ export function DepartmentManager({
 
     const headEmp = employees.find((e) => e.id === headEmployeeId);
 
-    if (editingDept) {
-      // update
-      const list = MockDataStore.getDepartments();
-      const idx = list.findIndex((d) => d.id === editingDept.id);
-      if (idx >= 0) {
-        list[idx] = {
-          ...list[idx],
-          name,
-          code: code.toUpperCase(),
-          description,
-          headEmployeeId: headEmployeeId || undefined,
-          headEmployeeName: headEmp ? `${headEmp.firstName} ${headEmp.lastName}` : undefined,
-          colorHex,
-          updatedAt: new Date().toISOString(),
-        };
-        localStorage.setItem("coralgenz_departments", JSON.stringify(list));
-      }
-      success("Department Updated", `Updated department details for ${name}`);
-    } else {
-      MockDataStore.addDepartment({
-        organizationId: "org-coralgenz-01",
-        name,
-        code: code.toUpperCase(),
-        description,
-        headEmployeeId: headEmployeeId || undefined,
-        headEmployeeName: headEmp ? `${headEmp.firstName} ${headEmp.lastName}` : undefined,
-        colorHex,
-        employeeCount: 0,
-        monthlyPayrollCost: 0,
-        isArchived: false,
-      });
-      success("Department Created", `Created ${name} (${code.toUpperCase()}) department.`);
-    }
+    const payload = {
+      id: editingDept?.id,
+      organizationId: "org-coralgenz-01",
+      name,
+      code: code.toUpperCase(),
+      description,
+      headEmployeeId: headEmployeeId || undefined,
+      headEmployeeName: headEmp ? `${headEmp.firstName} ${headEmp.lastName}` : undefined,
+      colorHex,
+      employeeCount: editingDept?.employeeCount || 0,
+      monthlyPayrollCost: editingDept?.monthlyPayrollCost || 0,
+    };
 
-    setShowModal(false);
-    refreshData();
+    try {
+      const res = await fetch("/api/departments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.department) {
+        success(
+          editingDept ? "Department Updated" : "Department Created",
+          `Saved ${name} (${code.toUpperCase()}) to server.`
+        );
+        setShowModal(false);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        refreshData();
+        onRefresh?.();
+      } else {
+        error("Error", data.error || "Failed to save department on server.");
+      }
+    } catch (err: any) {
+      error("Network Error", err.message || "Failed to save department.");
+    }
+  };
+
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete department "${name}"?`)) return;
+    try {
+      const res = await fetch(`/api/departments?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        success("Department Deleted", `Removed department from server.`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        refreshData();
+        onRefresh?.();
+      }
+    } catch {}
   };
 
   return (
@@ -154,14 +185,24 @@ export function DepartmentManager({
                 </div>
               </div>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleOpenEdit(dept)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit2 className="w-4 h-4 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleOpenEdit(dept)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Edit2 className="w-4 h-4 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(dept.id, dept.name)}
+                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             </CardHeader>
 
             <CardContent className="space-y-4 pt-0">
@@ -197,7 +238,7 @@ export function DepartmentManager({
         isOpen={showModal}
         onClose={() => setShowModal(false)}
         title={editingDept ? "Edit Department" : "Create New Department"}
-        description="Configure department information and leadership"
+        description="Configure department information and leadership on server"
       >
         <form onSubmit={handleSave} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

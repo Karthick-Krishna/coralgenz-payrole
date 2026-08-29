@@ -1,5 +1,5 @@
-import { collection, doc, getDocs, getDoc, setDoc, updateDoc, query } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from './config';
+import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, query } from 'firebase/firestore';
+import { db, auth, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
 import { Employee, UserRole } from '@/types';
 
@@ -7,26 +7,41 @@ export interface AddEmployeeOptions {
   portalPassword?: string;
   portalRole?: UserRole;
   createdBy?: string;
+  creatorRole?: string;
 }
 
 export class EmployeeService {
   private static collectionName = 'employees';
 
+  private static async getAuthHeaders(): Promise<Record<string, string>> {
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    try {
+      if (auth && auth.currentUser) {
+        const token = await auth.currentUser.getIdToken();
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+      }
+    } catch {}
+    return headers;
+  }
+
   /**
-   * Fetch all active employees directly via Server API with client Firestore fallback
+   * Fetch all active employees directly from the Server API with live client sync
    */
   public static async getEmployees(): Promise<Employee[]> {
     // 1. Try server API route
     try {
-      const res = await fetch('/api/employees', { cache: 'no-store' });
+      const headers = await this.getAuthHeaders();
+      const res = await fetch('/api/employees', { headers, cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (Array.isArray(data.employees)) {
           return data.employees;
         }
       }
-    } catch {
-      // Fall through to client Firestore
+    } catch (err) {
+      console.warn('Server API getEmployees notice:', err);
     }
 
     // 2. Client Firestore fallback
@@ -37,13 +52,15 @@ export class EmployeeService {
         const employees: Employee[] = [];
         querySnapshot.forEach((docSnap) => {
           const data = docSnap.data() as Employee;
-          if (data.status !== 'inactive') {
+          if (data && data.status !== 'inactive') {
             employees.push(data);
           }
         });
-        return employees.sort((a, b) => b.id.localeCompare(a.id));
+        if (employees.length > 0) {
+          return employees.sort((a, b) => b.id.localeCompare(a.id));
+        }
       } catch (error: any) {
-        console.warn('Client Firestore getEmployees error:', error?.message || error);
+        console.warn('Client Firestore getEmployees notice:', error?.message || error);
       }
     }
 
@@ -58,15 +75,16 @@ export class EmployeeService {
 
     // 1. Try server API route
     try {
-      const res = await fetch(`/api/employees/${id}`, { cache: 'no-store' });
+      const headers = await this.getAuthHeaders();
+      const res = await fetch(`/api/employees/${id}`, { headers, cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         if (data.employee) {
           return data.employee;
         }
       }
-    } catch {
-      // Fall through
+    } catch (err) {
+      console.warn('Server API getEmployeeById notice:', err);
     }
 
     // 2. Client Firestore fallback
@@ -86,38 +104,57 @@ export class EmployeeService {
   }
 
   /**
-   * Add a new employee profile directly on the Server (bypasses browser permission limits)
+   * Add a new employee profile to the Server Database & Google Cloud Firestore
    */
   public static async addEmployee(
     empData: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'> | Record<string, any>,
     options?: AddEmployeeOptions
   ): Promise<Employee> {
     const sanitizedEmpData = cleanFirestoreData(empData);
+    const headers = await this.getAuthHeaders();
 
-    // 1. First priority: Server API route (runs server-side with zero permission issues)
+    // 1. First priority: Server API route (persists to serverDb & Firestore)
     try {
       const res = await fetch('/api/employees', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           employeeData: sanitizedEmpData,
-          portalPassword: options?.portalPassword || 'Welcome@2026',
+          portalPassword: options?.portalPassword || '',
           portalRole: options?.portalRole || 'employee',
           createdBy: options?.createdBy || 'Super Admin',
+          creatorRole: options?.creatorRole || 'super_admin',
         }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.employee) {
-        return data.employee;
+        const savedEmp: Employee = data.employee;
+
+        // Also push to client Firestore if available
+        if (isFirebaseConfigured && db) {
+          try {
+            await setDoc(doc(db, this.collectionName, savedEmp.id), savedEmp, { merge: true });
+          } catch {}
+        }
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { employee: savedEmp } }));
+        }
+
+        return savedEmp;
       }
 
       if (!res.ok) {
-        console.warn('Server API addEmployee returned error:', data.error);
+        throw new Error(data.error || 'Server rejected employee creation.');
       }
     } catch (apiErr: any) {
-      console.warn('Server API addEmployee exception, attempting direct write:', apiErr.message);
+      console.warn('Server API addEmployee notice:', apiErr.message);
+      // If error is explicit user validation error, rethrow
+      if (apiErr.message && !apiErr.message.includes('fetch')) {
+        throw apiErr;
+      }
     }
 
     // 2. Client Firestore fallback with sanitized fields
@@ -141,6 +178,11 @@ export class EmployeeService {
         });
 
         await setDoc(doc(db, this.collectionName, nextId), newEmp);
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { employee: newEmp } }));
+        }
+
         return newEmp;
       } catch (clientErr: any) {
         console.error('Client Firestore addEmployee error:', clientErr.message);
@@ -148,31 +190,42 @@ export class EmployeeService {
       }
     }
 
-    throw new Error('Could not connect to database server. Please check your internet connection.');
+    throw new Error('Could not connect to database server. Please check your network connection.');
   }
 
   /**
-   * Update an existing employee in Firestore
+   * Update an existing employee in Server Database & Google Cloud Firestore
    */
   public static async updateEmployee(id: string, updates: Partial<Employee> | Record<string, any>): Promise<boolean> {
     if (!id) return false;
     const sanitizedUpdates = cleanFirestoreData(updates);
+    const headers = await this.getAuthHeaders();
 
-    // 1. Server API route
+    // 1. Server API route (persists to serverDb & Firestore)
     try {
       const res = await fetch(`/api/employees/${id}`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify(sanitizedUpdates),
       });
       if (res.ok) {
+        // Also sync to client Firestore
+        if (isFirebaseConfigured && db) {
+          try {
+            await setDoc(doc(db, this.collectionName, id), {
+              ...sanitizedUpdates,
+              updatedAt: new Date().toISOString(),
+            }, { merge: true });
+          } catch {}
+        }
+
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
         }
         return true;
       }
-    } catch {
-      // Fall through
+    } catch (err) {
+      console.warn('Server API updateEmployee notice:', err);
     }
 
     // 2. Client Firestore fallback
@@ -183,6 +236,7 @@ export class EmployeeService {
           ...sanitizedUpdates,
           updatedAt: new Date().toISOString(),
         }, { merge: true });
+
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { id, updates: sanitizedUpdates } }));
         }
@@ -203,26 +257,39 @@ export class EmployeeService {
    */
   public static async deleteEmployee(id: string): Promise<boolean> {
     if (!id) return false;
+    const headers = await this.getAuthHeaders();
 
     // 1. Server API route
     try {
       const res = await fetch(`/api/employees/${id}`, {
         method: 'DELETE',
+        headers,
       });
-      if (res.ok) return true;
-    } catch {
-      // Fall through
+      if (res.ok) {
+        if (isFirebaseConfigured && db) {
+          try {
+            await deleteDoc(doc(db, this.collectionName, id));
+          } catch {}
+        }
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { deletedId: id } }));
+        }
+        return true;
+      }
+    } catch (err) {
+      console.warn('Server API deleteEmployee notice:', err);
     }
 
     // 2. Client Firestore fallback
     if (isFirebaseConfigured && db) {
       try {
-        const { deleteDoc } = await import('firebase/firestore');
         await deleteDoc(doc(db, this.collectionName, id));
-        return true;
       } catch {}
     }
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('coralgenz_store_updated', { detail: { deletedId: id } }));
+    }
     return true;
   }
 }

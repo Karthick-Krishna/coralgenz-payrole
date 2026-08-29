@@ -46,48 +46,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let employeeId = "";
     let displayName = cleanEmail.split("@")[0].replace(/[._]/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
     let photoURL: string | undefined = undefined;
+    let isEnrolled = false;
 
     // Strict Hardcoded Roles per requirements
     if (cleanEmail === "karthick@coralgenz.co.in") {
       role = "super_admin";
+      employeeId = "CGG-EMP-0001";
+      displayName = "Karthick Krishna";
+      photoURL = "/logo.png";
+      isEnrolled = true;
+      return { role, employeeId, displayName, photoURL, isEnrolled };
     } else if (cleanEmail === "thanvanth@coralgenz.co.in") {
       role = "hr_admin";
     } else if (cleanEmail === "sharveshwaran.r@coralgenz.co.in") {
       role = "manager";
     }
 
-    // Attempt to fetch profile info (like employeeId, displayName) from server API
+    // 1. Attempt to fetch profile info directly from server API
     try {
       const res = await fetch(`/api/auth/profile?email=${encodeURIComponent(cleanEmail)}&uid=${encodeURIComponent(uid)}`, { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (data.profile) {
-          employeeId = data.profile.employeeId || employeeId;
+        if (data.exists && data.profile && data.profile.employeeId) {
+          employeeId = data.profile.employeeId;
           displayName = data.profile.displayName || displayName;
           photoURL = data.profile.photoURL || photoURL;
+          isEnrolled = true;
         }
       }
     } catch (e) {
       console.warn("Server profile API notice:", e);
     }
 
-    // Fallback client Firestore checks for employeeId mapping
-    if (isFirebaseConfigured && db && !employeeId) {
+    // 2. Fallback client Firestore checks for employeeId mapping
+    if (isFirebaseConfigured && db && !isEnrolled) {
       try {
         const empQuery = query(collection(db, "employees"), where("email", "==", cleanEmail));
         const empSnap = await getDocs(empQuery);
         if (!empSnap.empty) {
           const emp = empSnap.docs[0].data();
-          employeeId = emp.id || employeeId;
-          displayName = `${emp.firstName} ${emp.lastName}`;
-          photoURL = emp.avatarUrl || photoURL;
+          if (emp.status !== "inactive") {
+            employeeId = emp.id || employeeId;
+            displayName = `${emp.firstName} ${emp.lastName}`.trim();
+            photoURL = emp.avatarUrl || photoURL;
+            isEnrolled = true;
+          }
         }
       } catch (err: any) {
         console.warn("Error fetching Firestore user profile:", err?.message || err);
       }
     }
 
-    return { role, employeeId, displayName, photoURL };
+    return { role, employeeId, displayName, photoURL, isEnrolled };
   };
 
   useEffect(() => {
@@ -102,6 +112,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (fbUser) {
             const email = fbUser.email?.toLowerCase().trim() || "";
             const profile = await resolveUserProfile(fbUser.uid, email);
+
+            // If user is authenticated in Firebase Auth but no employee record exists in DB
+            if (!profile.isEnrolled && email !== "karthick@coralgenz.co.in") {
+              if (firebaseAuth) await fbSignOut(firebaseAuth);
+              setUser(null);
+              setIsLoading(false);
+              clearTimeout(failsafeTimer);
+              return;
+            }
 
             const matchedUser: User = {
               id: fbUser.uid,
@@ -156,6 +175,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const userCredential = await signInWithEmailAndPassword(firebaseAuth, cleanEmail, pass);
         const fbUser = userCredential.user;
         const profile = await resolveUserProfile(fbUser.uid, cleanEmail);
+
+        // Verify if employee is enroled in the company database
+        if (!profile.isEnrolled && cleanEmail !== "karthick@coralgenz.co.in") {
+          await fbSignOut(firebaseAuth);
+          setUser(null);
+          setIsLoading(false);
+          return {
+            success: false,
+            error: "No employee profile found for this email address. Please contact your organization administrator or HR to enrole your employee profile in the payroll system."
+          };
+        }
 
         const isSuper = cleanEmail === "karthick@coralgenz.co.in" || profile.role === "super_admin";
         

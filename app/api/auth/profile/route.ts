@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server';
-import { adminDb, adminAuth } from '@/lib/firebase/admin';
+import { adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
-import { collection, doc, getDoc, getDocs, query, where } from 'firebase/firestore';
-import { serverEmployeeCache } from '@/lib/server/employee-store';
+import { collection, getDocs, query, where } from 'firebase/firestore';
+import { serverDb } from '@/lib/server/server-db';
 import { Employee, UserRole } from '@/types';
 
 export async function GET(request: Request) {
@@ -31,26 +31,34 @@ export async function GET(request: Request) {
       role = 'manager';
     }
 
-    // 2. Query Firestore users collection via Admin SDK
-    if (adminDb && typeof adminDb.collection === 'function') {
+    let foundEmployee: Employee | null = null;
+
+    // 2. Check persistent Server Database first
+    if (email) {
+      foundEmployee = serverDb.getEmployeeByEmail(email);
+    }
+
+    // 3. Query Firestore employees collection via Admin SDK if not found
+    if (!foundEmployee && adminDb && typeof adminDb.collection === 'function') {
       try {
-        if (uid) {
-          const userDoc = await adminDb.collection('users').doc(uid).get();
-          if (userDoc.exists) {
-            const data = userDoc.data();
-            role = (data?.role as UserRole) || role;
-            employeeId = data?.employeeId || employeeId;
-            displayName = data?.displayName || displayName;
-            photoURL = data?.photoURL || photoURL;
+        if (email) {
+          const empSnap = await adminDb.collection('employees').where('email', '==', email).get();
+          if (!empSnap.empty) {
+            foundEmployee = empSnap.docs[0].data() as Employee;
+            serverDb.saveEmployee(foundEmployee);
           }
         }
-        if (!employeeId && email) {
-          const userSnap = await adminDb.collection('users').where('email', '==', email).get();
-          if (!userSnap.empty) {
-            const data = userSnap.docs[0].data();
-            employeeId = data?.employeeId || employeeId;
-            displayName = data?.displayName || displayName;
-            photoURL = data?.photoURL || photoURL;
+        if (!foundEmployee && uid) {
+          const userDoc = await adminDb.collection('users').doc(uid).get();
+          if (userDoc.exists) {
+            const uData = userDoc.data();
+            if (uData?.employeeId) {
+              const empDoc = await adminDb.collection('employees').doc(uData.employeeId).get();
+              if (empDoc.exists) {
+                foundEmployee = empDoc.data() as Employee;
+                serverDb.saveEmployee(foundEmployee);
+              }
+            }
           }
         }
       } catch (err: any) {
@@ -58,63 +66,74 @@ export async function GET(request: Request) {
       }
     }
 
-    // 3. Query Firestore employees collection via Admin SDK
-    if (adminDb && typeof adminDb.collection === 'function') {
+    // 4. Query Client Firestore if not found
+    if (!foundEmployee && db && email) {
       try {
-        let empSnap;
-        if (employeeId) {
-          const empDoc = await adminDb.collection('employees').doc(employeeId).get();
-          if (empDoc.exists) {
-            const emp = empDoc.data() as Employee;
-            displayName = `${emp.firstName} ${emp.lastName}`.trim();
-            photoURL = emp.avatarUrl || photoURL;
-            departmentName = emp.departmentName || '';
-            designationTitle = emp.designationTitle || '';
-            // role is strict based on email, do not overwrite
-          }
-        } else if (email) {
-          empSnap = await adminDb.collection('employees').where('email', '==', email).get();
-          if (!empSnap.empty) {
-            const emp = empSnap.docs[0].data() as Employee;
-            employeeId = emp.id;
-            displayName = `${emp.firstName} ${emp.lastName}`.trim();
-            photoURL = emp.avatarUrl || photoURL;
-            departmentName = emp.departmentName || '';
-            designationTitle = emp.designationTitle || '';
-            // role is strict based on email, do not overwrite
-          }
+        const q = query(collection(db, 'employees'), where('email', '==', email));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+          foundEmployee = snap.docs[0].data() as Employee;
+          serverDb.saveEmployee(foundEmployee);
         }
-      } catch {}
-    }
-
-    // 4. Client SDK / Server Cache Fallback
-    if (!employeeId && email) {
-      for (const [id, emp] of serverEmployeeCache.entries()) {
-        if (emp.email?.toLowerCase() === email) {
-          employeeId = emp.id;
-          displayName = `${emp.firstName} ${emp.lastName}`.trim();
-          photoURL = emp.avatarUrl || photoURL;
-          departmentName = emp.departmentName || '';
-          designationTitle = emp.designationTitle || '';
-          // role is strict based on email, do not overwrite
-          break;
-        }
+      } catch (err: any) {
+        console.warn('Client Firestore profile lookup notice:', err.message);
       }
     }
 
-    // 5. Removed fallback designation-based role derivation. Role is strict.
+    // If employee record is found
+    if (foundEmployee) {
+      employeeId = foundEmployee.id;
+      displayName = `${foundEmployee.firstName} ${foundEmployee.lastName}`.trim();
+      photoURL = foundEmployee.avatarUrl || '';
+      departmentName = foundEmployee.departmentName || '';
+      designationTitle = foundEmployee.designationTitle || '';
 
+      return NextResponse.json({
+        success: true,
+        exists: true,
+        isEnrolled: true,
+        profile: {
+          role: foundEmployee.role || role,
+          employeeId,
+          displayName,
+          email: foundEmployee.email || email,
+          photoURL,
+          departmentName,
+          designationTitle,
+          status: foundEmployee.status || 'active',
+          currentMonthlyGross: foundEmployee.currentMonthlyGross,
+          joiningDate: foundEmployee.joiningDate,
+          workLocation: foundEmployee.workLocation,
+        },
+      });
+    }
+
+    // Special Founder/Super Admin Bypass if not explicitly in employees collection
+    if (email === 'karthick@coralgenz.co.in') {
+      return NextResponse.json({
+        success: true,
+        exists: true,
+        isEnrolled: true,
+        profile: {
+          role: 'super_admin',
+          employeeId: 'CGG-EMP-0001',
+          displayName: 'Karthick Krishna',
+          email,
+          photoURL: '/logo.png',
+          departmentName: 'Executive Leadership',
+          designationTitle: 'Managing Director & Super Admin',
+          status: 'active',
+        },
+      });
+    }
+
+    // If no employee profile exists for this email
     return NextResponse.json({
       success: true,
-      profile: {
-        role,
-        employeeId: employeeId || 'CGG-EMP-0001',
-        displayName,
-        email,
-        photoURL,
-        departmentName,
-        designationTitle,
-      },
+      exists: false,
+      isEnrolled: false,
+      profile: null,
+      message: 'No employee profile found for this email address.',
     });
   } catch (error: any) {
     console.error('GET /api/auth/profile error:', error);

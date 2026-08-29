@@ -1,8 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Designation, Department } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,16 +16,19 @@ import {
   Building2,
   Users,
   Edit2,
+  Trash2,
 } from "lucide-react";
 
 interface DesignationManagerProps {
   initialDesignations: Designation[];
   departments: Department[];
+  onRefresh?: () => void;
 }
 
 export function DesignationManager({
   initialDesignations,
   departments,
+  onRefresh,
 }: DesignationManagerProps) {
   const { success, error } = useToast();
   const [designations, setDesignations] = useState<Designation[]>(initialDesignations);
@@ -39,8 +41,18 @@ export function DesignationManager({
   const [minSalary, setMinSalary] = useState(50000);
   const [maxSalary, setMaxSalary] = useState(100000);
 
-  const refreshData = () => {
-    setDesignations(MockDataStore.getDesignations());
+  useEffect(() => {
+    setDesignations(initialDesignations);
+  }, [initialDesignations]);
+
+  const refreshData = async () => {
+    try {
+      const res = await fetch("/api/designations", { cache: "no-store" });
+      const data = await res.json();
+      if (data?.designations) {
+        setDesignations(data.designations);
+      }
+    } catch {}
   };
 
   const handleOpenAdd = () => {
@@ -63,7 +75,7 @@ export function DesignationManager({
     setShowModal(true);
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title) {
       error("Missing Title", "Please provide a designation title.");
@@ -72,40 +84,61 @@ export function DesignationManager({
 
     const dept = departments.find((d) => d.id === departmentId);
 
-    if (editingDesig) {
-      const list = MockDataStore.getDesignations();
-      const idx = list.findIndex((d) => d.id === editingDesig.id);
-      if (idx >= 0) {
-        list[idx] = {
-          ...list[idx],
-          title,
-          departmentId,
-          departmentName: dept?.name || "General",
-          description,
-          minSalary: Number(minSalary),
-          maxSalary: Number(maxSalary),
-          updatedAt: new Date().toISOString(),
-        };
-        localStorage.setItem("coralgenz_designations", JSON.stringify(list));
-      }
-      success("Designation Updated", `Updated designation ${title}`);
-    } else {
-      MockDataStore.addDesignation({
-        organizationId: "org-coralgenz-01",
-        title,
-        departmentId,
-        departmentName: dept?.name || "General",
-        description,
-        minSalary: Number(minSalary),
-        maxSalary: Number(maxSalary),
-        employeeCount: 0,
-        status: "active",
-      });
-      success("Designation Created", `Created designation ${title}`);
-    }
+    const payload = {
+      id: editingDesig?.id,
+      organizationId: "org-coralgenz-01",
+      title,
+      departmentId,
+      departmentName: dept?.name || "General",
+      description,
+      minSalary: Number(minSalary),
+      maxSalary: Number(maxSalary),
+      employeeCount: editingDesig?.employeeCount || 0,
+      status: "active",
+    };
 
-    setShowModal(false);
-    refreshData();
+    try {
+      const res = await fetch("/api/designations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      const data = await res.json();
+
+      if (res.ok && data.designation) {
+        success(
+          editingDesig ? "Designation Updated" : "Designation Created",
+          `Saved designation ${title} on server.`
+        );
+        setShowModal(false);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        refreshData();
+        onRefresh?.();
+      } else {
+        error("Error", data.error || "Failed to save designation on server.");
+      }
+    } catch (err: any) {
+      error("Network Error", err.message || "Failed to save designation.");
+    }
+  };
+
+  const handleDelete = async (id: string, desigTitle: string) => {
+    if (!confirm(`Delete designation "${desigTitle}"?`)) return;
+    try {
+      const res = await fetch(`/api/designations?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        success("Designation Deleted", `Removed designation from server.`);
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        refreshData();
+        onRefresh?.();
+      }
+    } catch {}
   };
 
   return (
@@ -137,40 +170,47 @@ export function DesignationManager({
           <Card key={desig.id} hoverEffect className="flex flex-col justify-between">
             <CardHeader className="flex flex-row items-start justify-between pb-3">
               <div className="space-y-1">
-                <CardTitle className="text-base">{desig.title}</CardTitle>
-                <Badge variant="coral" size="sm">
+                <Badge variant="secondary" size="sm">
                   {desig.departmentName}
                 </Badge>
+                <CardTitle className="text-base pt-1">{desig.title}</CardTitle>
               </div>
 
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleOpenEdit(desig)}
-                className="h-8 w-8 p-0"
-              >
-                <Edit2 className="w-4 h-4 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
-              </Button>
+              <div className="flex items-center gap-1">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleOpenEdit(desig)}
+                  className="h-8 w-8 p-0"
+                >
+                  <Edit2 className="w-4 h-4 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDelete(desig.id, desig.title)}
+                  className="h-8 w-8 p-0 text-red-500 hover:text-red-700"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
             </CardHeader>
 
             <CardContent className="space-y-4 pt-0">
               <p className="text-xs text-slate-600 dark:text-slate-300 min-h-[36px] line-clamp-2">
-                {desig.description || "Standard role responsibilities."}
+                {desig.description || "Role responsibilities standard across company operations."}
               </p>
 
-              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 text-xs space-y-1.5">
-                <div className="flex justify-between text-slate-500">
-                  <span>Salary Band:</span>
-                  <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+              <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 flex items-center justify-between text-xs">
+                <div>
+                  <span className="text-[10px] uppercase font-bold text-slate-400 block">
+                    Band Range
+                  </span>
+                  <span className="font-semibold text-slate-700 dark:text-slate-300 font-mono">
                     {formatINR(desig.minSalary)} - {formatINR(desig.maxSalary)}
                   </span>
                 </div>
-                <div className="flex justify-between text-slate-500">
-                  <span>Active Headcount:</span>
-                  <span className="font-bold text-slate-900 dark:text-slate-100">
-                    {desig.employeeCount} Employees
-                  </span>
-                </div>
+                <Badge variant="success" size="sm">Active Role</Badge>
               </div>
             </CardContent>
           </Card>
@@ -181,8 +221,8 @@ export function DesignationManager({
       <Modal
         isOpen={showModal}
         onClose={() => setShowModal(false)}
-        title={editingDesig ? "Edit Designation" : "Add New Designation"}
-        description="Configure role title, department mapping, and salary ranges"
+        title={editingDesig ? "Edit Designation" : "Create New Designation"}
+        description="Define standard role requirements and approved salary bands"
       >
         <form onSubmit={handleSave} className="space-y-4">
           <Input
@@ -190,38 +230,40 @@ export function DesignationManager({
             required
             value={title}
             onChange={(e) => setTitle(e.target.value)}
-            placeholder="e.g. Senior Frontend Engineer"
+            placeholder="e.g. Senior Software Engineer"
           />
 
           <Select
-            label="Department"
+            label="Assigned Department"
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
           >
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.name} ({d.code})
+            {departments.map((dept) => (
+              <option key={dept.id} value={dept.id}>
+                {dept.name} ({dept.code})
               </option>
             ))}
           </Select>
 
           <Input
-            label="Role Description"
+            label="Role Overview"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            placeholder="Key responsibilities and qualifications"
+            placeholder="Core competencies and responsibilities"
           />
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
               label="Minimum Monthly Salary (₹)"
               type="number"
+              required
               value={minSalary}
               onChange={(e) => setMinSalary(Number(e.target.value))}
             />
             <Input
               label="Maximum Monthly Salary (₹)"
               type="number"
+              required
               value={maxSalary}
               onChange={(e) => setMaxSalary(Number(e.target.value))}
             />

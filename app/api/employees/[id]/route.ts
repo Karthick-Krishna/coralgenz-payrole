@@ -3,7 +3,7 @@ import { adminAuth, adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
 import { doc, getDoc, setDoc, deleteDoc, collection, addDoc, query, where, getDocs } from 'firebase/firestore';
 import { FirestoreRest } from '@/lib/firebase/firestore-rest';
-import { serverEmployeeCache } from '@/lib/server/employee-store';
+import { serverDb } from '@/lib/server/server-db';
 import { cleanFirestoreData } from '@/lib/firebase/sanitize';
 import { Employee, UserRole } from '@/types';
 
@@ -14,43 +14,35 @@ export async function GET(
   try {
     const { id } = await params;
 
-    // 1. Try Admin Firestore
+    // 1. Try persistent Server Database
+    const serverEmp = serverDb.getEmployeeById(id);
+    if (serverEmp) {
+      return NextResponse.json({ success: true, employee: serverEmp });
+    }
+
+    // 2. Try Admin Firestore
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
         const snap = await adminDb.collection('employees').doc(id).get();
         if (snap.exists) {
           const emp = snap.data() as Employee;
-          serverEmployeeCache.set(id, emp);
+          serverDb.saveEmployee(emp);
           return NextResponse.json({ success: true, employee: emp });
         }
       } catch {}
     }
 
-    // 2. Try Client Firestore
+    // 3. Try Client Firestore
     if (db) {
       try {
         const docRef = doc(db, 'employees', id);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const emp = docSnap.data() as Employee;
-          serverEmployeeCache.set(id, emp);
+          serverDb.saveEmployee(emp);
           return NextResponse.json({ success: true, employee: emp });
         }
       } catch {}
-    }
-
-    // 3. Try Cloud Firestore REST
-    try {
-      const restEmp = await FirestoreRest.getEmployee(id);
-      if (restEmp) {
-        serverEmployeeCache.set(id, restEmp);
-        return NextResponse.json({ success: true, employee: restEmp });
-      }
-    } catch {}
-
-    // 4. Try Server Cache
-    if (serverEmployeeCache.has(id)) {
-      return NextResponse.json({ success: true, employee: serverEmployeeCache.get(id) });
     }
 
     return NextResponse.json({ error: 'Employee not found' }, { status: 404 });
@@ -65,6 +57,7 @@ export async function PUT(
 ) {
   try {
     const { id } = await params;
+    const authHeader = request.headers.get('authorization') || undefined;
     const body = await request.json();
     const {
       portalPassword,
@@ -81,13 +74,8 @@ export async function PUT(
       updatedAt: new Date().toISOString(),
     });
 
-    // 1. Determine role security: Only Super Admin can modify system role
-    const isSuperAdmin = 
-      creatorRole === 'super_admin' || 
-      (changedByName || createdBy)?.toLowerCase() === 'super admin' || 
-      (changedByName || createdBy)?.toLowerCase() === 'karthick krishna';
-
-    let existingEmp = serverEmployeeCache.get(id);
+    // 1. Fetch existing employee from server database or Firestore
+    let existingEmp = serverDb.getEmployeeById(id);
 
     if (!existingEmp) {
       if (adminDb && typeof adminDb.collection === 'function') {
@@ -104,19 +92,6 @@ export async function PUT(
       }
     }
 
-    if (portalRole || updates.role) {
-      if (isSuperAdmin) {
-        updates.role = (portalRole || updates.role) as UserRole;
-        updates.portalRole = (portalRole || updates.role) as UserRole;
-      } else if (existingEmp?.role) {
-        updates.role = existingEmp.role;
-        updates.portalRole = existingEmp.role;
-      } else {
-        updates.role = 'employee';
-        updates.portalRole = 'employee';
-      }
-    }
-
     const mergedEmp: Employee = cleanFirestoreData({
       ...(existingEmp || {}),
       ...updates,
@@ -124,47 +99,61 @@ export async function PUT(
       updatedAt: new Date().toISOString(),
     });
 
-    // Update in-memory server cache
-    serverEmployeeCache.set(id, mergedEmp);
-
-    // 2. Persist to Firestore REST
-    try {
-      await FirestoreRest.setEmployee(id, mergedEmp);
-    } catch (restErr: any) {
-      console.warn('Firestore REST employee update notice:', restErr.message);
+    // Enforce strict roles based on email
+    const cleanEmail = (mergedEmp.email || '').toLowerCase().trim();
+    if (cleanEmail === 'karthick@coralgenz.co.in') {
+      mergedEmp.role = 'super_admin';
+    } else if (cleanEmail === 'thanvanth@coralgenz.co.in') {
+      mergedEmp.role = 'hr_admin';
+    } else if (cleanEmail === 'sharveshwaran.r@coralgenz.co.in') {
+      mergedEmp.role = 'manager';
+    } else if (!mergedEmp.role) {
+      mergedEmp.role = 'employee';
     }
+    mergedEmp.portalRole = mergedEmp.role;
 
-    // 3. Persist to Admin Firestore
+    // 2. Persist to Server Database (Durable Disk Storage)
+    const savedEmp = serverDb.saveEmployee(mergedEmp);
+
+    // 3. Persist to Google Cloud Firestore
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
-        await adminDb.collection('employees').doc(id).set(mergedEmp, { merge: true });
+        await adminDb.collection('employees').doc(id).set(savedEmp, { merge: true });
       } catch (adminErr: any) {
         console.warn('Admin Firestore employee update notice:', adminErr.message);
       }
     }
 
-    // 4. Persist to Client Firestore
     if (db) {
       try {
-        await setDoc(doc(db!, 'employees', id), mergedEmp, { merge: true });
+        await setDoc(doc(db!, 'employees', id), savedEmp, { merge: true });
       } catch (clientErr: any) {
         console.warn('Client Firestore employee update notice:', clientErr.message);
       }
     }
 
-    const cleanEmail = (mergedEmp.email || '').toLowerCase().trim();
-    const cleanDisplayName = `${mergedEmp.firstName || ''} ${mergedEmp.lastName || ''}`.trim();
+    try {
+      await FirestoreRest.setEmployee(id, savedEmp, authHeader);
+    } catch {}
 
-    // 5. Update corresponding user document in `users` collection
+    const cleanDisplayName = `${savedEmp.firstName || ''} ${savedEmp.lastName || ''}`.trim();
+
+    // 4. Update corresponding user document in `users` collection
     const userUpdatePayload = cleanFirestoreData({
       displayName: cleanDisplayName,
       email: cleanEmail,
-      phone: mergedEmp.phone || null,
-      role: mergedEmp.role || 'employee',
-      photoURL: mergedEmp.avatarUrl || null,
-      gender: mergedEmp.gender || null,
+      phone: savedEmp.phone || null,
+      role: savedEmp.role || 'employee',
+      photoURL: savedEmp.avatarUrl || null,
+      gender: savedEmp.gender || null,
+      status: savedEmp.status || 'active',
       updatedAt: new Date().toISOString(),
     });
+
+    const userDoc = serverDb.getUser(id) || serverDb.getUser(`usr-${id.toLowerCase()}`);
+    if (userDoc) {
+      serverDb.saveUser({ ...userDoc, ...userUpdatePayload });
+    }
 
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
@@ -186,37 +175,25 @@ export async function PUT(
       } catch {}
     }
 
-    // 6. Removed Firebase Authentication Password & Display Info updates
-    // as per user requirements to strictly manage auth via Firebase Console.
-
-    // 7. Record Security Audit Log
-    const auditPayload = {
+    // 5. Record Security Audit Log
+    serverDb.addAuditLog({
+      id: `audit-${Date.now()}`,
+      organizationId: 'org-coralgenz-01',
       userId: changedBy || 'usr-admin',
       userName: changedByName || createdBy || 'Administrator',
-      userRole: creatorRole || 'super_admin',
+      userRole: (creatorRole as UserRole) || 'super_admin',
       action: 'update_employee',
       module: 'employee',
       recordId: id,
       recordTitle: cleanDisplayName || id,
-      details: `Updated employee profile, credentials and server records for ${cleanDisplayName} (${id}).`,
+      details: `Updated employee profile and server records for ${cleanDisplayName} (${id}).`,
       timestamp: new Date().toISOString(),
-    };
-
-    if (adminDb && typeof adminDb.collection === 'function') {
-      try {
-        await adminDb.collection('audit_logs').add(auditPayload);
-      } catch {}
-    }
-    if (db) {
-      try {
-        await addDoc(collection(db!, 'audit_logs'), auditPayload);
-      } catch {}
-    }
+    });
 
     return NextResponse.json({
       success: true,
-      message: 'Employee details and credentials updated successfully on server.',
-      employee: mergedEmp,
+      message: 'Employee details updated successfully on server.',
+      employee: savedEmp,
     });
   } catch (error: any) {
     console.error('PUT /api/employees/[id] error:', error);
@@ -230,46 +207,22 @@ export async function DELETE(
 ) {
   try {
     const { id } = await params;
+    const existingEmp = serverDb.getEmployeeById(id);
+    const employeeName = existingEmp ? `${existingEmp.firstName} ${existingEmp.lastName}`.trim() : id;
+    const employeeEmail = existingEmp?.email || '';
 
-    let employeeName = id;
-    let employeeEmail = '';
+    // 1. Delete from Server Database
+    serverDb.deleteEmployee(id);
 
-    // Retrieve employee info before deletion
-    if (serverEmployeeCache.has(id)) {
-      const emp = serverEmployeeCache.get(id)!;
-      employeeName = `${emp.firstName} ${emp.lastName}`.trim();
-      employeeEmail = emp.email || '';
-      serverEmployeeCache.delete(id);
-    }
-
-    // 1. Delete from Admin Firestore & Firebase Auth
+    // 2. Delete from Admin Firestore & Firebase Auth
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
-        const empDoc = await adminDb.collection('employees').doc(id).get();
-        if (empDoc.exists) {
-          const emp = empDoc.data() as Employee;
-          employeeName = `${emp.firstName} ${emp.lastName}`.trim();
-          employeeEmail = emp.email || employeeEmail;
-        }
-
-        // Delete employee doc
         await adminDb.collection('employees').doc(id).delete();
-
-        // Delete user docs
         await adminDb.collection('users').doc(id).delete();
         await adminDb.collection('users').doc(`usr-${id.toLowerCase()}`).delete();
-
-        if (employeeEmail) {
-          const userSnap = await adminDb.collection('users').where('email', '==', employeeEmail.toLowerCase()).get();
-          userSnap.forEach(async (d) => await d.ref.delete());
-        }
-
-        // Delete leave balance doc
         await adminDb.collection('leaveBalances').doc(`lb-${id}-2026`).delete();
-        await adminDb.collection('leaveBalances').doc(id).delete();
 
-        // Delete Auth account if adminAuth is configured
-        if (adminAuth && employeeEmail) {
+        if (employeeEmail && adminAuth) {
           try {
             const authUser = await adminAuth.getUserByEmail(employeeEmail.toLowerCase());
             if (authUser) {
@@ -282,7 +235,7 @@ export async function DELETE(
       }
     }
 
-    // 2. Delete from Client Firestore SDK
+    // 3. Delete from Client Firestore SDK
     if (db) {
       try {
         await deleteDoc(doc(db, 'employees', id));
@@ -290,7 +243,6 @@ export async function DELETE(
         await deleteDoc(doc(db, 'users', `usr-${id.toLowerCase()}`));
         await deleteDoc(doc(db, 'leaveBalances', `lb-${id}-2026`));
 
-        // Delete the actual user document that maps to the employee ID
         const q = query(collection(db, 'users'), where('employeeId', '==', id));
         const userDocs = await getDocs(q);
         for (const userDoc of userDocs.docs) {
@@ -301,8 +253,10 @@ export async function DELETE(
       }
     }
 
-    // 3. Log Audit Event
-    const auditPayload = cleanFirestoreData({
+    // 4. Log Audit Event
+    serverDb.addAuditLog({
+      id: `audit-${Date.now()}`,
+      organizationId: 'org-coralgenz-01',
       userId: 'system',
       userName: 'Super Admin',
       userRole: 'super_admin',
@@ -310,19 +264,9 @@ export async function DELETE(
       module: 'employee',
       recordId: id,
       recordTitle: employeeName,
-      details: `Permanently removed employee record and server auth account for ${employeeName} (${id}).`,
+      details: `Permanently removed employee record and server data for ${employeeName} (${id}).`,
       timestamp: new Date().toISOString(),
     });
-
-    if (adminDb && typeof adminDb.collection === 'function') {
-      try {
-        await adminDb.collection('audit_logs').add(auditPayload);
-      } catch {}
-    } else if (db) {
-      try {
-        await addDoc(collection(db, 'audit_logs'), auditPayload);
-      } catch {}
-    }
 
     return NextResponse.json({
       success: true,

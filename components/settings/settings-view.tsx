@@ -32,9 +32,10 @@ import {
 
 interface SettingsViewProps {
   initialOrg: Organization;
+  onRefresh?: () => void;
 }
 
-export function SettingsView({ initialOrg }: SettingsViewProps) {
+export function SettingsView({ initialOrg, onRefresh }: SettingsViewProps) {
   const { user: currentUser, isSuperAdmin } = useAuth();
   const { success, error } = useToast();
   const [activeTab, setActiveTab] = useState("organization");
@@ -49,6 +50,10 @@ export function SettingsView({ initialOrg }: SettingsViewProps) {
   const [newUserRole, setNewUserRole] = useState<UserRole>("employee");
 
   useEffect(() => {
+    setOrg(initialOrg);
+  }, [initialOrg]);
+
+  useEffect(() => {
     setUsers(MockDataStore.getUsers());
   }, []);
 
@@ -56,15 +61,31 @@ export function SettingsView({ initialOrg }: SettingsViewProps) {
     setOrg((prev) => ({ ...prev, [field]: val }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    setTimeout(() => {
-      const updated = MockDataStore.updateOrganization(org);
-      setOrg(updated);
-      success("Settings Saved", "Organization configuration updated successfully.");
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(org),
+      });
+      const data = await res.json();
+      if (res.ok && data.organization) {
+        setOrg(data.organization);
+        success("Settings Saved", "Organization configuration updated successfully on server.");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        onRefresh?.();
+      } else {
+        error("Save Error", data.error || "Failed to update settings.");
+      }
+    } catch (err: any) {
+      error("Network Error", err.message || "Failed to update settings.");
+    } finally {
       setIsSaving(false);
-    }, 400);
+    }
   };
 
   const handleResetDefaults = () => {

@@ -3,30 +3,53 @@
 import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { DesignationManager } from "@/components/designations/designation-manager";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Designation, Department } from "@/types";
 
 export default function DesignationsPage() {
   const [designations, setDesignations] = useState<Designation[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = () => {
-    setDesignations(MockDataStore.getDesignations());
-    setDepartments(MockDataStore.getDepartments());
+  const loadData = async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
+    try {
+      const [desigRes, deptRes] = await Promise.all([
+        fetch("/api/designations", { cache: "no-store" }).then((r) => r.json()),
+        fetch("/api/departments", { cache: "no-store" }).then((r) => r.json()),
+      ]);
+      if (desigRes?.designations) {
+        setDesignations(desigRes.designations);
+      }
+      if (deptRes?.departments) {
+        setDepartments(deptRes.departments);
+      }
+    } catch (e) {
+      console.error("Error loading designations:", e);
+    } finally {
+      if (isInitial) setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadData();
-    window.addEventListener("coralgenz_store_updated", loadData);
-    return () => window.removeEventListener("coralgenz_store_updated", loadData);
+    loadData(true);
+    const handleUpdate = () => loadData(false);
+    window.addEventListener("coralgenz_store_updated", handleUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleUpdate);
   }, []);
 
   return (
     <AppLayout module="designations">
-      <DesignationManager
-        initialDesignations={designations}
-        departments={departments}
-      />
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
+        </div>
+      ) : (
+        <DesignationManager
+          initialDesignations={designations}
+          departments={departments}
+          onRefresh={() => loadData(false)}
+        />
+      )}
     </AppLayout>
   );
 }

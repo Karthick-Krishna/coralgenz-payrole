@@ -1,25 +1,50 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { useAuth } from "@/lib/auth/auth-context";
+import { EmployeeService } from "@/lib/firebase/employee-service";
+import { Employee } from "@/types";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/toast";
-import { getInitials } from "@/lib/utils";
-import { User, Mail, Phone, Lock, Save, Shield } from "lucide-react";
+import { getInitials, formatDate } from "@/lib/utils";
+import { User, Mail, Phone, Lock, Save, Shield, Briefcase, Building, Calendar, MapPin } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, currentRole, updateCurrentUser } = useAuth();
   const { success, error } = useToast();
 
+  const [employee, setEmployee] = useState<Employee | null>(null);
   const [name, setName] = useState(user?.displayName || "");
-  const [phone, setPhone] = useState(user?.phone || "+91 98765 43210");
+  const [phone, setPhone] = useState(user?.phone || "");
   const [currentPass, setCurrentPass] = useState("");
   const [newPass, setNewPass] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    const loadProfile = async () => {
+      if (user?.employeeId) {
+        const emp = await EmployeeService.getEmployeeById(user.employeeId);
+        if (emp) {
+          setEmployee(emp);
+          setName(`${emp.firstName} ${emp.lastName}`.trim());
+          if (emp.phone) setPhone(emp.phone);
+        }
+      } else if (user?.email) {
+        const emps = await EmployeeService.getEmployees();
+        const emp = emps.find((e) => e.email?.toLowerCase() === user.email?.toLowerCase());
+        if (emp) {
+          setEmployee(emp);
+          setName(`${emp.firstName} ${emp.lastName}`.trim());
+          if (emp.phone) setPhone(emp.phone);
+        }
+      }
+    };
+    loadProfile();
+  }, [user]);
 
   const handleSaveProfile = (e: React.FormEvent) => {
     e.preventDefault();
@@ -115,39 +140,50 @@ export default function ProfilePage() {
             </CardContent>
           </Card>
 
-          {/* Security & Password */}
+          {/* Employment & Organization Info */}
           <Card>
             <CardHeader>
-              <CardTitle>Security & Password</CardTitle>
+              <CardTitle>Employment & Directory Details</CardTitle>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpdatePassword} className="space-y-4">
-                <Input
-                  label="Current Password"
-                  type="password"
-                  value={currentPass}
-                  onChange={(e) => setCurrentPass(e.target.value)}
-                  leftIcon={<Lock className="w-4 h-4" />}
-                />
-
-                <Input
-                  label="New Password"
-                  type="password"
-                  value={newPass}
-                  onChange={(e) => setNewPass(e.target.value)}
-                  leftIcon={<Lock className="w-4 h-4" />}
-                  helperText="Minimum 8 characters"
-                />
-
-                <Button
-                  type="submit"
-                  variant="outline"
-                  size="sm"
-                  leftIcon={<Shield className="w-4 h-4" />}
-                >
-                  Update Password
-                </Button>
-              </form>
+            <CardContent className="space-y-4">
+              <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800 space-y-2.5 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Employee ID</span>
+                  <span className="font-mono font-bold text-slate-800 dark:text-slate-200">
+                    {employee?.id || user?.employeeId || "CGG-EMP-0001"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Designation</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {employee?.designationTitle || "Managing Director & Super Admin"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Department</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {employee?.departmentName || "Executive Leadership"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Work Location</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {employee?.workLocation || "Coimbatore HQ"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Joining Date</span>
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {employee?.joiningDate ? formatDate(employee.joiningDate) : "01 Jan 2024"}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-400 font-medium">Employment Status</span>
+                  <Badge variant="success" size="sm" dot className="capitalize">
+                    {employee?.status || "Active"}
+                  </Badge>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>

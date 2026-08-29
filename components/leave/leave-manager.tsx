@@ -63,6 +63,13 @@ export function LeaveManager({
   const [daysCount, setDaysCount] = useState(1);
   const [leaveReason, setLeaveReason] = useState("");
 
+  const myEmpId =
+    user?.employeeId ||
+    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
+    "CGG-EMP-0001";
+  const isEmployee = currentRole === "employee";
+  const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "manager";
+
   useEffect(() => {
     setRequests(initialLeaveRequests);
     setBalances(initialBalances);
@@ -70,19 +77,25 @@ export function LeaveManager({
 
   const refreshData = async () => {
     try {
-      const data = await LeaveService.getLeaves();
+      const data = await LeaveService.getLeaves(isEmployee ? myEmpId : undefined);
       setRequests(data.requests);
-      if (data.balance) setBalances([data.balance]);
+      if (data.balance) {
+        setBalances((prev) => {
+          const others = prev.filter((b) => b.employeeId !== data.balance?.employeeId);
+          return [data.balance!, ...others];
+        });
+      }
     } catch (err) {
       console.error("Failed to refresh leave data", err);
     }
   };
 
   useEffect(() => {
+    refreshData();
     const handleStoreUpdate = () => refreshData();
     window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
     return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
-  }, []);
+  }, [myEmpId]);
 
   // Compute days count when dates change
   useEffect(() => {
@@ -96,13 +109,6 @@ export function LeaveManager({
       setDaysCount(1);
     }
   }, [startDate, endDate]);
-
-  const myEmpId =
-    user?.employeeId ||
-    employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase())?.id ||
-    "CGG-EMP-0001";
-  const isEmployee = currentRole === "employee";
-  const canApprove = currentRole === "super_admin" || currentRole === "hr_admin" || currentRole === "manager";
 
   const handleApplyLeave = async (e: React.FormEvent) => {
     e.preventDefault();

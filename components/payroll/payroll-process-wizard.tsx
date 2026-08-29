@@ -104,6 +104,8 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
     try {
       const res = await PayrollService.lockAndPublishPayroll({
         runId: generatedRun.id,
+        run: generatedRun,
+        items: payrollItems,
         approvedBy: user?.id || "usr-superadmin-01",
         approvedByName: user?.displayName || "Super Admin",
       });

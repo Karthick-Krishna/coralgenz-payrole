@@ -1,41 +1,30 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
-import { collection, doc, setDoc, getDocs, getDoc, query, where, addDoc } from 'firebase/firestore';
+import { collection, doc, setDoc, getDocs, getDoc, query, where } from 'firebase/firestore';
+import { serverDb } from '@/lib/server/server-db';
 import { cleanFirestoreData } from '@/lib/firebase/sanitize';
 import { LeaveRequest, LeaveBalance } from '@/types';
 
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-    const employeeId = searchParams.get('employeeId');
+    const employeeId = searchParams.get('employeeId') || undefined;
 
-    const requests: LeaveRequest[] = [];
-    let balance: LeaveBalance | null = null;
-
-    // 1. Admin Firestore
+    // 1. Sync from Admin Firestore if available
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
         let q: any = adminDb.collection('leaveRequests');
         if (employeeId) q = q.where('employeeId', '==', employeeId);
         const snap = await q.get();
-        snap.forEach((d: any) => requests.push(d.data() as LeaveRequest));
-
-        if (employeeId) {
-          const balSnap = await adminDb.collection('leaveBalances').doc(`lb-${employeeId}-2026`).get();
-          if (balSnap.exists) {
-            balance = balSnap.data() as LeaveBalance;
-          }
-        }
-
-        if (requests.length > 0 || balance) {
-          requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-          return NextResponse.json({ success: true, requests, balance });
-        }
+        snap.forEach((d: any) => {
+          const l = d.data() as LeaveRequest;
+          if (l && l.id) serverDb.saveLeaveRequest(l);
+        });
       } catch {}
     }
 
-    // 2. Client Firestore
+    // 2. Sync from Client Firestore if available
     if (db) {
       try {
         let q = query(collection(db, 'leaveRequests'));
@@ -43,23 +32,21 @@ export async function GET(request: Request) {
           q = query(collection(db, 'leaveRequests'), where('employeeId', '==', employeeId));
         }
         const snap = await getDocs(q);
-        snap.forEach((d) => requests.push(d.data() as LeaveRequest));
-
-        if (employeeId) {
-          const balDoc = await getDoc(doc(db, 'leaveBalances', `lb-${employeeId}-2026`));
-          if (balDoc.exists()) {
-            balance = balDoc.data() as LeaveBalance;
-          }
-        }
-
-        requests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-        return NextResponse.json({ success: true, requests, balance });
+        snap.forEach((d) => {
+          const l = d.data() as LeaveRequest;
+          if (l && l.id) serverDb.saveLeaveRequest(l);
+        });
       } catch {}
     }
 
-    return NextResponse.json({ success: true, requests: [], balance: null });
+    // 3. Return from Server Database
+    const requests = serverDb.getLeaveRequests(employeeId);
+    const balance = employeeId ? serverDb.getLeaveBalance(employeeId) : null;
+
+    return NextResponse.json({ success: true, requests, balance });
   } catch (error: any) {
-    return NextResponse.json({ success: true, requests: [], balance: null });
+    const requests = serverDb.getLeaveRequests();
+    return NextResponse.json({ success: true, requests, balance: null });
   }
 }
 
@@ -74,44 +61,55 @@ export async function POST(request: Request) {
         ...leaveRequest,
         id,
         status: leaveRequest.status || 'pending',
-        createdAt: new Date().toISOString(),
+        createdAt: leaveRequest.createdAt || new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       });
 
+      // 1. Persist to Server Database
+      const savedLeave = serverDb.saveLeaveRequest(newLeave);
+
+      // 2. Persist to Firestore
       if (adminDb && typeof adminDb.collection === 'function') {
         try {
-          await adminDb.collection('leaveRequests').doc(id).set(newLeave, { merge: true });
+          await adminDb.collection('leaveRequests').doc(id).set(savedLeave, { merge: true });
         } catch {}
       }
 
       if (db) {
         try {
-          await setDoc(doc(db, 'leaveRequests', id), newLeave, { merge: true });
+          await setDoc(doc(db, 'leaveRequests', id), savedLeave, { merge: true });
         } catch {}
       }
 
-      return NextResponse.json({ success: true, leaveRequest: newLeave });
+      return NextResponse.json({ success: true, leaveRequest: savedLeave });
     }
 
     if (action === 'update' && requestId && updateData) {
-      const updates = cleanFirestoreData({
+      const existing = serverDb.getLeaveRequests().find((r) => r.id === requestId);
+      const merged: LeaveRequest = cleanFirestoreData({
+        ...(existing || {}),
         ...updateData,
+        id: requestId,
         updatedAt: new Date().toISOString(),
       });
 
+      // 1. Persist to Server Database (will also auto-deduct balance if approved)
+      const savedLeave = serverDb.saveLeaveRequest(merged);
+
+      // 2. Persist to Firestore
       if (adminDb && typeof adminDb.collection === 'function') {
         try {
-          await adminDb.collection('leaveRequests').doc(requestId).update(updates);
+          await adminDb.collection('leaveRequests').doc(requestId).set(savedLeave, { merge: true });
         } catch {}
       }
 
       if (db) {
         try {
-          await setDoc(doc(db, 'leaveRequests', requestId), updates, { merge: true });
+          await setDoc(doc(db, 'leaveRequests', requestId), savedLeave, { merge: true });
         } catch {}
       }
 
-      return NextResponse.json({ success: true, message: 'Leave status updated' });
+      return NextResponse.json({ success: true, message: 'Leave status updated', leaveRequest: savedLeave });
     }
 
     return NextResponse.json({ error: 'Invalid leave action' }, { status: 400 });

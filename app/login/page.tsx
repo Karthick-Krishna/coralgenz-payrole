@@ -16,6 +16,7 @@ import {
   Eye,
   EyeOff,
   CheckCircle2,
+  AlertCircle,
 } from "lucide-react";
 
 interface PortalConfig {
@@ -83,15 +84,18 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [loginError, setLoginError] = useState<string | null>(null);
   
   const selectedPortal = PORTALS.find((p) => p.id === activePortal) || PORTALS[0];
 
   const handleSelectPortal = (portal: PortalConfig) => {
     setActivePortal(portal.id);
+    setLoginError(null);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setLoginError(null);
     if (!email || !password) {
       toastError("Missing Fields", "Please enter your registered email and password.");
       return;
@@ -105,7 +109,9 @@ export default function LoginPage() {
       success("Authenticated Successfully", "Welcome to Coralgenz.");
       router.push("/dashboard");
     } else {
-      toastError("Authentication Failed", res.error || "Invalid credentials or unauthorized portal access.");
+      const errMsg = res.error || "Invalid credentials or unauthorized portal access.";
+      setLoginError(errMsg);
+      toastError("Authentication Failed", errMsg);
     }
   };
 
@@ -202,6 +208,19 @@ export default function LoginPage() {
                 </p>
               </div>
             </div>
+
+            {/* Error / Enrollment Notice */}
+            {loginError && (
+              <div className="p-4 rounded-2xl bg-rose-50/90 border border-rose-200 text-rose-800 text-xs space-y-1.5 animate-in fade-in duration-200 shadow-sm">
+                <div className="flex items-center gap-2 font-bold text-rose-900 text-xs sm:text-sm">
+                  <AlertCircle className="w-4 h-4 text-rose-600 shrink-0" />
+                  <span>Enrolment & Authentication Notice</span>
+                </div>
+                <p className="text-rose-700 leading-relaxed pl-6">
+                  {loginError}
+                </p>
+              </div>
+            )}
 
             {/* Login Form */}
             <form onSubmit={handleSubmit} className="space-y-4">

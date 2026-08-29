@@ -3,30 +3,52 @@
 import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { DepartmentManager } from "@/components/departments/department-manager";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Department, Employee } from "@/types";
 
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const loadData = () => {
-    setDepartments(MockDataStore.getDepartments());
-    setEmployees(MockDataStore.getEmployees());
+  const loadData = async (isInitial = false) => {
+    if (isInitial) setIsLoading(true);
+    try {
+      const [deptRes, empList] = await Promise.all([
+        fetch("/api/departments", { cache: "no-store" }).then((r) => r.json()),
+        EmployeeService.getEmployees(),
+      ]);
+      if (deptRes?.departments) {
+        setDepartments(deptRes.departments);
+      }
+      setEmployees(empList);
+    } catch (e) {
+      console.error("Error loading departments:", e);
+    } finally {
+      if (isInitial) setIsLoading(false);
+    }
   };
 
   useEffect(() => {
-    loadData();
-    window.addEventListener("coralgenz_store_updated", loadData);
-    return () => window.removeEventListener("coralgenz_store_updated", loadData);
+    loadData(true);
+    const handleUpdate = () => loadData(false);
+    window.addEventListener("coralgenz_store_updated", handleUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleUpdate);
   }, []);
 
   return (
     <AppLayout module="departments">
-      <DepartmentManager
-        initialDepartments={departments}
-        employees={employees}
-      />
+      {isLoading ? (
+        <div className="flex h-64 items-center justify-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
+        </div>
+      ) : (
+        <DepartmentManager
+          initialDepartments={departments}
+          employees={employees}
+          onRefresh={() => loadData(false)}
+        />
+      )}
     </AppLayout>
   );
 }

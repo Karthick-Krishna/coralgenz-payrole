@@ -4,7 +4,7 @@ import { db } from '@/lib/firebase/config';
 import { collection, doc, setDoc, getDocs, addDoc } from 'firebase/firestore';
 import { calculateEmployeePayroll, EmployeeAttendanceData } from '@/lib/payroll/engine';
 import { cleanFirestoreData } from '@/lib/firebase/sanitize';
-import { serverEmployeeCache } from '@/lib/server/employee-store';
+import { serverDb } from '@/lib/server/server-db';
 import { Employee, PayrollItem, PayrollRun } from '@/types';
 
 export async function POST(request: Request) {
@@ -21,18 +21,19 @@ export async function POST(request: Request) {
       processedByName = 'Super Admin',
     } = body;
 
-    // 1. Fetch active employees from Firestore
-    let activeEmployees: Employee[] = [];
+    // 1. Fetch active employees from persistent server database
+    let activeEmployees = serverDb.getEmployees();
 
-    if (adminDb && typeof adminDb.collection === 'function') {
+    if (activeEmployees.length === 0 && adminDb && typeof adminDb.collection === 'function') {
       try {
         const snap = await adminDb.collection('employees').get();
         snap.forEach((docSnap) => {
           const emp = docSnap.data() as Employee;
           if (emp.status !== 'inactive') {
-            activeEmployees.push(emp);
+            serverDb.saveEmployee(emp);
           }
         });
+        activeEmployees = serverDb.getEmployees();
       } catch (err: any) {
         console.warn('Admin Firestore fetch employees notice:', err.message);
       }
@@ -44,16 +45,13 @@ export async function POST(request: Request) {
         snap.forEach((docSnap) => {
           const emp = docSnap.data() as Employee;
           if (emp.status !== 'inactive') {
-            activeEmployees.push(emp);
+            serverDb.saveEmployee(emp);
           }
         });
+        activeEmployees = serverDb.getEmployees();
       } catch (err: any) {
         console.warn('Client Firestore fetch employees notice:', err.message);
       }
-    }
-
-    if (activeEmployees.length === 0 && serverEmployeeCache.size > 0) {
-      activeEmployees = Array.from(serverEmployeeCache.values()).filter((e) => e.status !== 'inactive');
     }
 
     if (activeEmployees.length === 0) {
@@ -126,10 +124,14 @@ export async function POST(request: Request) {
       updatedAt: new Date().toISOString(),
     });
 
-    // 3. Save PayrollRun and PayrollItems to Firestore
+    // 3. Persist to Server Database
+    const savedRun = serverDb.savePayrollRun(run);
+    serverDb.savePayrollItems(items);
+
+    // 4. Save PayrollRun and PayrollItems to Firestore
     if (adminDb && typeof adminDb.collection === 'function') {
       try {
-        await adminDb.collection('payrollRuns').doc(runId).set(run, { merge: true });
+        await adminDb.collection('payrollRuns').doc(runId).set(savedRun, { merge: true });
         for (const item of items) {
           await adminDb.collection('payrollItems').doc(item.id).set(cleanFirestoreData(item), { merge: true });
         }
@@ -140,7 +142,7 @@ export async function POST(request: Request) {
 
     if (db) {
       try {
-        await setDoc(doc(db, 'payrollRuns', runId), run, { merge: true });
+        await setDoc(doc(db, 'payrollRuns', runId), savedRun, { merge: true });
         for (const item of items) {
           await setDoc(doc(db, 'payrollItems', item.id), cleanFirestoreData(item), { merge: true });
         }
@@ -149,8 +151,10 @@ export async function POST(request: Request) {
       }
     }
 
-    // 4. Log Audit Event
-    const auditPayload = cleanFirestoreData({
+    // 5. Log Audit Event
+    serverDb.addAuditLog({
+      id: `audit-${Date.now()}`,
+      organizationId: 'org-coralgenz-01',
       userId: processedBy,
       userName: processedByName,
       userRole: 'super_admin',
@@ -162,19 +166,9 @@ export async function POST(request: Request) {
       timestamp: new Date().toISOString(),
     });
 
-    if (adminDb && typeof adminDb.collection === 'function') {
-      try {
-        await adminDb.collection('audit_logs').add(auditPayload);
-      } catch {}
-    } else if (db) {
-      try {
-        await addDoc(collection(db, 'audit_logs'), auditPayload);
-      } catch {}
-    }
-
     return NextResponse.json({
       success: true,
-      run,
+      run: savedRun,
       items,
       message: `Payroll for ${periodName} calculated successfully for ${items.length} employees.`,
     });

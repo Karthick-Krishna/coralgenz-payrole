@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, setDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
 import { Announcement } from '@/types';
@@ -43,6 +43,23 @@ export class AnnouncementService {
         try {
           const id = ann.id || `ann-${Date.now()}`;
           await setDoc(doc(db, 'announcements', id), cleanFirestoreData({ ...ann, id, publishedAt: ann.publishedAt || new Date().toISOString() }), { merge: true });
+          return true;
+        } catch {}
+      }
+      return false;
+    }
+  }
+
+  public static async deleteAnnouncement(id: string): Promise<boolean> {
+    try {
+      const res = await fetch(`/api/announcements?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      return res.ok;
+    } catch {
+      if (isFirebaseConfigured && db) {
+        try {
+          await deleteDoc(doc(db, 'announcements', id));
           return true;
         } catch {}
       }

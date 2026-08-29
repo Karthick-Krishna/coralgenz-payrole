@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { MockDataStore } from "@/lib/store/mock-store";
+import { LeaveService } from "@/lib/firebase/leave-service";
 import {
   Users,
   UserPlus,
@@ -49,12 +50,18 @@ export function HRDashboard({
   const presentToday = attendance.filter((a) => a.status === "present").length;
   const pendingLeaves = leaveRequests.filter((l) => l.status === "pending");
 
-  const handleApproveLeave = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(reqId, "approved", "usr-hr-01", "Karthick Krishna", "Approved by HR");
+  const handleApproveLeave = async (reqId: string) => {
+    await LeaveService.updateLeaveStatus(reqId, "approved", "Approved by HR");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+    }
   };
 
-  const handleRejectLeave = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(reqId, "rejected", "usr-hr-01", "Karthick Krishna", "Rejected by HR");
+  const handleRejectLeave = async (reqId: string) => {
+    await LeaveService.updateLeaveStatus(reqId, "rejected", "Rejected by HR");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+    }
   };
 
   return (

@@ -52,10 +52,12 @@ export class FirestoreRest {
     return obj;
   }
 
-  public static async getEmployees(): Promise<Employee[]> {
+  public static async getEmployees(authHeader?: string): Promise<Employee[]> {
     try {
       const url = `${this.baseUrl}/employees?pageSize=100`;
-      const res = await fetch(url, { cache: 'no-store' });
+      const headers: Record<string, string> = {};
+      if (authHeader) headers['Authorization'] = authHeader;
+      const res = await fetch(url, { headers, cache: 'no-store' });
       if (!res.ok) return [];
       const data = await res.json();
       if (!data.documents) return [];
@@ -65,13 +67,15 @@ export class FirestoreRest {
     }
   }
 
-  public static async setEmployee(id: string, employee: Employee): Promise<boolean> {
+  public static async setEmployee(id: string, employee: Employee, authHeader?: string): Promise<boolean> {
     try {
       const url = `${this.baseUrl}/employees/${id}`;
       const fields = this.toFirestoreFields(employee);
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (authHeader) headers['Authorization'] = authHeader;
       const res = await fetch(url, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ fields }),
       });
       return res.ok;
@@ -80,10 +84,12 @@ export class FirestoreRest {
     }
   }
 
-  public static async getEmployee(id: string): Promise<Employee | null> {
+  public static async getEmployee(id: string, authHeader?: string): Promise<Employee | null> {
     try {
       const url = `${this.baseUrl}/employees/${id}`;
-      const res = await fetch(url, { cache: 'no-store' });
+      const headers: Record<string, string> = {};
+      if (authHeader) headers['Authorization'] = authHeader;
+      const res = await fetch(url, { headers, cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
       return this.fromFirestoreFields(data.fields) as Employee;

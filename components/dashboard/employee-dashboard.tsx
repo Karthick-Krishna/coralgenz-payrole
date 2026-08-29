@@ -4,7 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth/auth-context";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { AttendanceService } from "@/lib/firebase/attendance-service";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -70,32 +70,59 @@ export function EmployeeDashboard({
 
   const empId = employee?.id || user?.employeeId || "CGG-EMP-0002";
 
-  const refreshAttendance = () => {
-    const today = new Date().toISOString().split("T")[0];
-    const att = MockDataStore.getAttendance(today);
-    const myAtt = att.find((a) => a.employeeId === empId);
-    setTodayAttendance(myAtt || null);
-    setIsCheckedIn(Boolean(myAtt?.checkIn && !myAtt?.checkOut));
+  const refreshAttendance = async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const records = await AttendanceService.getAttendance(empId);
+      const myAtt = records.find((a) => a.date === today && a.employeeId === empId) || records[0];
+      if (myAtt && myAtt.date === today) {
+        setTodayAttendance(myAtt);
+        setIsCheckedIn(Boolean(myAtt.checkIn && !myAtt.checkOut));
+      } else {
+        setTodayAttendance(null);
+        setIsCheckedIn(false);
+      }
+    } catch {}
   };
 
   useEffect(() => {
     refreshAttendance();
-    window.addEventListener("coralgenz_store_updated", refreshAttendance);
-    return () => window.removeEventListener("coralgenz_store_updated", refreshAttendance);
+    const handleStoreUpdate = () => refreshAttendance();
+    window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
+    return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
   }, [empId]);
 
-  const handlePunchToggle = () => {
-    if (isCheckedIn) {
-      MockDataStore.recordCheckOut(empId);
+  const handlePunchToggle = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const nowTime = new Date().toTimeString().split(" ")[0];
+    const empName = employee ? `${employee.firstName} ${employee.lastName}`.trim() : user?.displayName || "Employee";
+
+    if (isCheckedIn && todayAttendance) {
+      await AttendanceService.logAttendance({
+        ...todayAttendance,
+        checkOut: nowTime,
+        status: "present",
+        updatedAt: new Date().toISOString(),
+      });
     } else {
-      MockDataStore.recordCheckIn(
-        empId,
-        employee ? `${employee.firstName} ${employee.lastName}` : user?.displayName || "Employee",
-        employee?.departmentId || "dept-02",
-        "office"
-      );
+      await AttendanceService.logAttendance({
+        id: `att-${empId}-${today}`,
+        organizationId: "org-coralgenz-01",
+        employeeId: empId,
+        employeeName: empName,
+        departmentId: employee?.departmentId || "dept-01",
+        date: today,
+        checkIn: nowTime,
+        status: "present",
+        workMode: "office",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
     }
-    refreshAttendance();
+    await refreshAttendance();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+    }
   };
 
   const remainingCasual = leaveBalance?.casual?.remaining ?? 9;

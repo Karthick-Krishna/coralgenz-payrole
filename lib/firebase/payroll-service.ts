@@ -16,6 +16,8 @@ export interface ProcessPayrollParams {
 
 export interface LockPayrollParams {
   runId: string;
+  run?: PayrollRun;
+  items?: PayrollItem[];
   approvedBy?: string;
   approvedByName?: string;
 }

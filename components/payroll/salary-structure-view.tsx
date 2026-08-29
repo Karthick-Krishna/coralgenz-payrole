@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { SalaryStructure, StatutoryRulesConfig } from "@/types";
 import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
@@ -20,9 +20,10 @@ import {
 
 interface SalaryStructureViewProps {
   initialStructure: SalaryStructure;
+  onRefresh?: () => void;
 }
 
-export function SalaryStructureView({ initialStructure }: SalaryStructureViewProps) {
+export function SalaryStructureView({ initialStructure, onRefresh }: SalaryStructureViewProps) {
   const { success, error } = useToast();
   const [structure, setStructure] = useState<SalaryStructure>(initialStructure);
   const [statConfig, setStatConfig] = useState<StatutoryRulesConfig>(
@@ -30,33 +31,45 @@ export function SalaryStructureView({ initialStructure }: SalaryStructureViewPro
   );
   const [isSaving, setIsSaving] = useState(false);
 
+  useEffect(() => {
+    setStructure(initialStructure);
+    setStatConfig(initialStructure.statutoryConfig);
+  }, [initialStructure]);
+
   const handleStatChange = (field: keyof StatutoryRulesConfig, val: number | boolean) => {
     setStatConfig((prev) => ({ ...prev, [field]: val }));
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-    setTimeout(() => {
+    try {
       const updated: SalaryStructure = {
         ...structure,
         statutoryConfig: statConfig,
         updatedAt: new Date().toISOString(),
       };
-      setStructure(updated);
-
-      MockDataStore.logAudit({
-        userId: "usr-payroll-01",
-        userName: "Thanvanth H",
-        userRole: "hr_admin",
-        action: "update_settings",
-        module: "settings",
-        details: "Updated Indian Statutory Salary Structure and Tax rules",
+      const res = await fetch("/api/salary-structures", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(updated),
       });
-
-      success("Structure Updated", "Indian statutory payroll & tax rules successfully updated.");
+      const data = await res.json();
+      if (res.ok && data.salaryStructure) {
+        setStructure(data.salaryStructure);
+        success("Structure Updated", "Indian statutory payroll & tax rules successfully saved on server.");
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+        }
+        onRefresh?.();
+      } else {
+        error("Save Error", data.error || "Failed to update salary structure.");
+      }
+    } catch (err: any) {
+      error("Network Error", err.message || "Failed to update salary structure.");
+    } finally {
       setIsSaving(false);
-    }, 400);
+    }
   };
 
   return (

@@ -298,6 +298,7 @@ export interface LeaveBalance {
   maternity?: { allocated: number; used: number; remaining: number };
   paternity?: { allocated: number; used: number; remaining: number };
   unpaid: { used: number };
+  updatedAt?: string;
 }
 
 export interface SalaryComponent {
@@ -564,7 +565,13 @@ export interface AuditLog {
     | 'modify_attendance'
     | 'update_settings'
     | 'create_department'
+    | 'update_department'
+    | 'delete_department'
+    | 'create_designation'
+    | 'update_designation'
+    | 'delete_designation'
     | 'create_announcement'
+    | 'update_salary_structure'
     | 'submit_request'
     | 'approve_request'
     | 'reject_request'
@@ -572,7 +579,8 @@ export interface AuditLog {
     | 'create_user'
     | 'update_user'
     | 'update_password'
-    | 'delete_user';
+    | 'delete_user'
+    | 'system_event';
   module:
     | 'auth'
     | 'employee'
@@ -584,7 +592,8 @@ export interface AuditLog {
     | 'designation'
     | 'settings'
     | 'announcement'
-    | 'requests';
+    | 'requests'
+    | 'system';
   recordId?: string;
   recordTitle?: string;
   details: string;

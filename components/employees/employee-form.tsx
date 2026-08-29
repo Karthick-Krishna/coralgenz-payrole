@@ -217,26 +217,14 @@ export function EmployeeForm({
       return;
     }
 
-    if (!isEditing && formData.portalPassword !== formData.portalConfirmPassword) {
-      error("Password Mismatch", "Portal Password and Confirm Password do not match.");
-      setActiveTab("portal_access");
-      return;
-    }
-
-    if (!isEditing && formData.portalPassword.length < 6) {
-      error("Weak Password", "Portal password must be at least 6 characters long.");
-      setActiveTab("portal_access");
-      return;
-    }
-
-    if (isEditing && formData.portalPassword && formData.portalPassword.trim()) {
+    if (formData.portalPassword && formData.portalPassword.trim()) {
       if (formData.portalPassword !== formData.portalConfirmPassword) {
-        error("Password Mismatch", "New Password and Confirm Password do not match.");
+        error("Password Mismatch", "Password and Confirm Password do not match.");
         setActiveTab("portal_access");
         return;
       }
       if (formData.portalPassword.trim().length < 6) {
-        error("Weak Password", "New password must be at least 6 characters long.");
+        error("Weak Password", "Password must be at least 6 characters long.");
         setActiveTab("portal_access");
         return;
       }

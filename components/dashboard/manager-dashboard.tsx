@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDate } from "@/lib/utils";
 import { MockDataStore } from "@/lib/store/mock-store";
+import { LeaveService } from "@/lib/firebase/leave-service";
 import {
   Users,
   Clock,
@@ -37,24 +38,18 @@ export function ManagerDashboard({
     teamEmployees.some((te) => te.id === a.employeeId && a.status === "present")
   ).length;
 
-  const handleApprove = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(
-      reqId,
-      "approved",
-      managerEmployee?.id || "usr-manager-01",
-      managerEmployee ? `${managerEmployee.firstName} ${managerEmployee.lastName}` : "Manager",
-      "Approved by Team Manager"
-    );
+  const handleApprove = async (reqId: string) => {
+    await LeaveService.updateLeaveStatus(reqId, "approved", "Approved by Team Manager");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+    }
   };
 
-  const handleReject = (reqId: string) => {
-    MockDataStore.updateLeaveStatus(
-      reqId,
-      "rejected",
-      managerEmployee?.id || "usr-manager-01",
-      managerEmployee ? `${managerEmployee.firstName} ${managerEmployee.lastName}` : "Manager",
-      "Rejected by Team Manager"
-    );
+  const handleReject = async (reqId: string) => {
+    await LeaveService.updateLeaveStatus(reqId, "rejected", "Rejected by Team Manager");
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+    }
   };
 
   return (

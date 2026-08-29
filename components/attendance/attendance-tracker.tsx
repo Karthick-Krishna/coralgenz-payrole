@@ -128,6 +128,56 @@ export function AttendanceTracker({
     refreshData();
   };
 
+  const [isPunchedIn, setIsPunchedIn] = useState(false);
+  const [todayRecord, setTodayRecord] = useState<AttendanceRecord | null>(null);
+
+  const checkTodayStatus = () => {
+    const today = new Date().toISOString().split("T")[0];
+    const rec = attendance.find((a) => a.date === today && a.employeeId === myEmpId);
+    setTodayRecord(rec || null);
+    setIsPunchedIn(Boolean(rec?.checkIn && !rec?.checkOut));
+  };
+
+  useEffect(() => {
+    checkTodayStatus();
+  }, [attendance, myEmpId]);
+
+  const handleQuickPunch = async () => {
+    const today = new Date().toISOString().split("T")[0];
+    const nowTime = new Date().toTimeString().split(" ")[0];
+    const currentEmp = employees.find((e) => e.id === myEmpId) || employees.find((e) => e.email?.toLowerCase() === user?.email?.toLowerCase());
+    const empName = currentEmp ? `${currentEmp.firstName} ${currentEmp.lastName}`.trim() : user?.displayName || "Employee";
+
+    if (isPunchedIn && todayRecord) {
+      await AttendanceService.logAttendance({
+        ...todayRecord,
+        checkOut: nowTime,
+        status: "present",
+        updatedAt: new Date().toISOString(),
+      });
+      success("Clocked Out", `Clocked out successfully at ${nowTime}`);
+    } else {
+      await AttendanceService.logAttendance({
+        id: `att-${myEmpId}-${today}`,
+        organizationId: "org-coralgenz-01",
+        employeeId: myEmpId,
+        employeeName: empName,
+        departmentId: currentEmp?.departmentId || "dept-01",
+        date: today,
+        checkIn: nowTime,
+        status: "present",
+        workMode: "office",
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      success("Clocked In", `Clocked in successfully at ${nowTime}`);
+    }
+    await refreshData();
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+    }
+  };
+
   const handleExportCSV = () => {
     const exportData = filteredAttendance.map((a) => ({
       Date: a.date,
@@ -166,7 +216,17 @@ export function AttendanceTracker({
           </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-2 sm:gap-2.5 flex-wrap">
+          <Button
+            variant={isPunchedIn ? "danger" : "primary"}
+            size="sm"
+            onClick={handleQuickPunch}
+            leftIcon={<Fingerprint className="w-4 h-4" />}
+            className="w-full sm:w-auto text-xs shadow-sm font-bold"
+          >
+            {isPunchedIn ? "Punch Out (Clock Out)" : "Punch In (Clock In)"}
+          </Button>
+
           <Button
             variant="outline"
             size="sm"

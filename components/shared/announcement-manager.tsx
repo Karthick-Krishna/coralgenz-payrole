@@ -18,6 +18,7 @@ import {
   Pin,
   Calendar,
   Sparkles,
+  Trash2,
 } from "lucide-react";
 
 interface AnnouncementManagerProps {
@@ -61,23 +62,44 @@ export function AnnouncementManager({ initialAnnouncements, onRefresh }: Announc
       return;
     }
 
-    await AnnouncementService.addAnnouncement({
+    const res = await AnnouncementService.addAnnouncement({
       organizationId: "org-coralgenz-01",
       title,
       content,
       category,
       priority,
       authorId: user?.id || "usr-superadmin-01",
-      authorName: user?.displayName || "Admin",
+      authorName: user?.displayName || "Super Admin",
       authorRole: currentRole.replace("_", " ").toUpperCase(),
       isPinned,
     });
 
-    success("Announcement Broadcasted", "Published company-wide notification.");
-    setShowModal(false);
-    setTitle("");
-    setContent("");
-    refreshData();
+    if (res) {
+      success("Announcement Broadcasted", "Published company-wide notification on the server.");
+      setShowModal(false);
+      setTitle("");
+      setContent("");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+      }
+      refreshData();
+      onRefresh?.();
+    } else {
+      error("Error", "Failed to save announcement to server.");
+    }
+  };
+
+  const handleDelete = async (id: string, title: string) => {
+    if (!confirm(`Delete announcement "${title}"?`)) return;
+    const res = await AnnouncementService.deleteAnnouncement(id);
+    if (res) {
+      success("Announcement Deleted", "Removed announcement from server.");
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent("coralgenz_store_updated"));
+      }
+      refreshData();
+      onRefresh?.();
+    }
   };
 
   return (
@@ -141,6 +163,17 @@ export function AnnouncementManager({ initialAnnouncements, onRefresh }: Announc
                 <span>
                   Posted by <span className="font-semibold text-slate-700 dark:text-slate-300">{ann.authorName}</span> ({ann.authorRole})
                 </span>
+                {currentRole !== "employee" && (
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(ann.id, ann.title)}
+                    className="text-red-500 hover:text-red-700 p-1 transition-colors flex items-center gap-1"
+                    title="Delete Announcement"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>Delete</span>
+                  </button>
+                )}
               </div>
             </CardContent>
           </Card>
