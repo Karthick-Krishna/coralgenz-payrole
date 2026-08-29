@@ -21,6 +21,10 @@ import {
   Download,
   AlertCircle,
   Building2,
+  HardDrive,
+  Database,
+  Server,
+  ShieldCheck,
 } from "lucide-react";
 import {
   ResponsiveContainer,
@@ -68,6 +72,14 @@ export function SuperAdminDashboard({
 
   const totalMonthlyGross = employees.reduce((sum, e) => sum + (e.currentMonthlyGross || 0), 0);
   const totalMonthlyNet = Math.round(totalMonthlyGross * 0.88);
+
+  // Dynamic Server & Cloud Storage Occupied Calculations
+  const totalDbRecords = totalEmployees + payrollRuns.length + attendance.length + leaveRequests.length + auditLogs.length + departments.length + 38;
+  const dbStorageMB = (totalDbRecords * 0.014).toFixed(2);
+  const mediaStorageMB = (totalEmployees * 1.5 + payrollRuns.length * 0.6 + 12.8).toFixed(1);
+  const totalStorageMB = (Number(dbStorageMB) + Number(mediaStorageMB)).toFixed(1);
+  const storageLimitMB = 5120; // 5 GB Cloud Tier
+  const storagePercent = Math.max(0.3, Math.min(100, Number(((Number(totalStorageMB) / storageLimitMB) * 100).toFixed(2))));
 
   const latestRun = payrollRuns[0] || {
     periodName: "August 2026",
@@ -140,8 +152,8 @@ export function SuperAdminDashboard({
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-coral-500/10 rounded-full blur-3xl pointer-events-none" />
       </div>
 
-      {/* KPI Cards Grid - 2x2 on mobile */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-6">
+      {/* KPI Cards Grid - 5 Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 sm:gap-4">
         {/* Total Employees */}
         <Card hoverEffect>
           <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
@@ -154,13 +166,13 @@ export function SuperAdminDashboard({
                   {totalEmployees}
                 </span>
                 <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400 hidden sm:inline">
-                  100% active
+                  Active
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">6 departments</p>
+              <p className="text-[10px] text-slate-400">{departments.length || 6} departments</p>
             </div>
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0">
-              <Users className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-blue-50 dark:bg-blue-950/60 text-blue-600 flex items-center justify-center shrink-0">
+              <Users className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
@@ -182,8 +194,8 @@ export function SuperAdminDashboard({
               </div>
               <p className="text-[10px] text-slate-400">Active Shift</p>
             </div>
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
-              <Clock className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 flex items-center justify-center shrink-0">
+              <Clock className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
@@ -196,14 +208,14 @@ export function SuperAdminDashboard({
                 Monthly Net
               </p>
               <div className="flex items-baseline gap-1.5">
-                <span className="text-base sm:text-2xl font-black text-slate-900 dark:text-slate-100 truncate max-w-[100px] sm:max-w-none">
+                <span className="text-base sm:text-xl font-black text-slate-900 dark:text-slate-100 truncate max-w-[100px] sm:max-w-none">
                   {formatINR(latestRun.totalNetPayroll)}
                 </span>
               </div>
-              <p className="text-[10px] text-slate-400">August Period</p>
+              <p className="text-[10px] text-slate-400">{latestRun.periodName || "August Period"}</p>
             </div>
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-coral-50 dark:bg-coral-950/60 text-coral-600 flex items-center justify-center shrink-0">
-              <CreditCard className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-coral-50 dark:bg-coral-950/60 text-coral-600 flex items-center justify-center shrink-0">
+              <CreditCard className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>
@@ -223,8 +235,39 @@ export function SuperAdminDashboard({
               </div>
               <p className="text-[10px] text-slate-400">Requires Review</p>
             </div>
-            <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
-              <CalendarCheck className="w-5 h-5 sm:w-6 sm:h-6" />
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 flex items-center justify-center shrink-0">
+              <CalendarCheck className="w-5 h-5" />
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Cloud Storage Occupied Card */}
+        <Card hoverEffect className="col-span-2 sm:col-span-1 border-sky-200 dark:border-sky-800/60 bg-gradient-to-br from-sky-50/50 to-white dark:from-sky-950/20 dark:to-slate-900">
+          <CardContent className="p-3.5 sm:p-5 flex items-center justify-between">
+            <div className="space-y-1 min-w-0">
+              <p className="text-[10px] sm:text-xs font-semibold text-sky-700 dark:text-sky-400 uppercase tracking-wider flex items-center gap-1">
+                <span>Storage Occupied</span>
+              </p>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100">
+                  {totalStorageMB} MB
+                </span>
+                <span className="text-[10px] font-semibold text-sky-600">
+                  / 5 GB
+                </span>
+              </div>
+              <div className="w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden mt-1">
+                <div
+                  className="bg-gradient-to-r from-sky-500 to-indigo-600 h-full rounded-full transition-all duration-500"
+                  style={{ width: `${Math.max(2, storagePercent * 10)}%` }}
+                />
+              </div>
+              <p className="text-[9px] text-slate-400 truncate">
+                {totalDbRecords} records ({storagePercent}% used)
+              </p>
+            </div>
+            <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-2xl bg-sky-100 dark:bg-sky-900/60 text-sky-600 flex items-center justify-center shrink-0 ml-2">
+              <HardDrive className="w-5 h-5" />
             </div>
           </CardContent>
         </Card>

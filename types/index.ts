@@ -359,6 +359,8 @@ export interface PayrollItem {
   departmentName: string;
   designationTitle: string;
   panNumber?: string;
+  payslipNumber?: string;
+  refNo?: string;
   bankAccountNumber: string;
   bankName: string;
   ifscCode: string;

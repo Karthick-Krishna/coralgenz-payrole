@@ -68,7 +68,7 @@ export class PayrollService {
       let totalDeductions = 0;
       let totalTaxes = 0;
 
-      const items: PayrollItem[] = activeEmployees.map(emp => {
+      const items: PayrollItem[] = activeEmployees.map((emp, idx) => {
         const gross = emp.currentMonthlyGross || 0;
         const basic = Math.round(gross * 0.4);
         const hra = Math.round(gross * 0.2);
@@ -85,6 +85,8 @@ export class PayrollService {
         totalDeductions += deductions;
         totalTaxes += tax;
 
+        const defaultRefNo = `CGG-PS-${params.year}-${String(params.month).padStart(2, "0")}-${String(idx + 1).padStart(4, "0")}`;
+
         return cleanFirestoreData({
           id: `pi-${runId}-${emp.id}`,
           payrollRunId: runId,
@@ -95,6 +97,8 @@ export class PayrollService {
           departmentName: emp.departmentName || '',
           designationTitle: emp.designationTitle || '',
           panNumber: emp.panNumber || emp.bankDetails?.panNumber || '',
+          payslipNumber: defaultRefNo,
+          refNo: defaultRefNo,
           bankAccountNumber: emp.bankDetails?.accountNumber || '',
           bankName: emp.bankDetails?.bankName || '',
           ifscCode: emp.bankDetails?.ifscCode || '',
@@ -183,23 +187,42 @@ export class PayrollService {
       if (!runSnap.exists()) return { success: false, error: 'Run not found' };
       const run = { ...runSnap.data(), id: runSnap.id } as PayrollRun;
 
-      // 2. Get Items
-      const itemsSnap = await getDocs(query(collection(db, 'payrollItems'), where('payrollRunId', '==', params.runId)));
-      const items: PayrollItem[] = [];
-      itemsSnap.forEach(d => items.push({ ...d.data(), id: d.id } as PayrollItem));
+      // 2. Use passed items if available (contains user's custom edits and ref numbers), otherwise fetch from Firestore
+      let items: PayrollItem[] = params.items && params.items.length > 0 ? params.items : [];
+      if (items.length === 0) {
+        const itemsSnap = await getDocs(query(collection(db, 'payrollItems'), where('payrollRunId', '==', params.runId)));
+        itemsSnap.forEach(d => items.push({ ...d.data(), id: d.id } as PayrollItem));
+      }
 
       const payslips: Payslip[] = [];
+      let totalGross = 0;
+      let totalNet = 0;
+      let totalDeductions = 0;
 
-      // 3. Generate Payslips and Update Items
-      for (const item of items) {
-        // Update item status
-        await updateDoc(doc(db, 'payrollItems', item.id), { status: 'approved' });
+      // 3. Generate Payslips and Update Items with custom edits
+      for (let idx = 0; idx < items.length; idx++) {
+        const item = items[idx];
+        const payslipNumber = item.payslipNumber || item.refNo || `CGG-PS-${run.year}-${String(run.month).padStart(2, '0')}-${String(idx + 1).padStart(4, '0')}`;
         
-        // Generate payslip
+        // Update item in Firestore with full edited values
+        const updatedItem = cleanFirestoreData({
+          ...item,
+          payslipNumber,
+          refNo: payslipNumber,
+          status: 'approved'
+        });
+        await setDoc(doc(db, 'payrollItems', item.id), updatedItem);
+
+        totalGross += Number(item.grossSalary) || 0;
+        totalNet += Number(item.netSalary) || 0;
+        totalDeductions += Number(item.totalDeductions) || 0;
+        
+        // Generate payslip with full customizable breakdown
         const payslip = cleanFirestoreData({
           id: `ps-${params.runId}-${item.employeeId}`,
+          payslipNumber,
           payrollRunId: params.runId,
-          organizationId: item.organizationId,
+          organizationId: item.organizationId || 'org-coralgenz-01',
           employeeId: item.employeeId,
           employeeName: item.employeeName,
           employeeCode: item.employeeCode,
@@ -213,30 +236,36 @@ export class PayrollService {
           year: run.year,
           paymentDate: run.paymentDate,
           periodName: run.periodName,
+          payDate: run.paymentDate,
           
-          totalWorkingDays: item.totalWorkingDays,
-          daysPresent: item.daysPresent,
-          daysOnLeave: item.daysOnLeave,
-          daysLossOfPay: item.daysLossOfPay,
+          workingDays: Number(item.totalWorkingDays) || 0,
+          presentDays: Number(item.daysPresent) || 0,
+          leaveDays: Number(item.daysOnLeave) || 0,
+          lossOfPayDays: Number(item.daysLossOfPay) || 0,
           
           earnings: {
-            basic: item.basicSalary,
-            hra: item.hra,
-            conveyance: item.conveyanceAllowance,
-            medical: item.medicalAllowance,
-            special: item.specialAllowance,
-            other: item.otherEarnings
+            basic: Number(item.basicSalary) || 0,
+            hra: Number(item.hra) || 0,
+            conveyance: Number(item.conveyanceAllowance) || 0,
+            medical: Number(item.medicalAllowance) || 0,
+            specialAllowance: Number(item.specialAllowance) || 0,
+            bonus: Number(item.performanceBonus) || 0,
+            overtime: Number(item.overtimePay) || 0,
+            other: Number(item.otherEarnings) || 0
           },
           deductions: {
-            pf: item.providentFund,
-            professionalTax: item.professionalTax,
-            tds: item.incomeTaxTDS,
-            other: item.otherDeductions
+            pf: Number(item.providentFund) || 0,
+            esi: Number(item.esi) || 0,
+            professionalTax: Number(item.professionalTax) || 0,
+            tds: Number(item.incomeTaxTDS) || 0,
+            incomeTax: Number(item.incomeTaxTDS) || 0,
+            lossOfPay: Number(item.lossOfPayDeduction) || 0,
+            other: Number(item.otherDeductions) || 0
           },
           
-          grossSalary: item.grossSalary,
-          totalDeductions: item.totalDeductions,
-          netSalary: item.netSalary,
+          grossSalary: Number(item.grossSalary) || 0,
+          totalDeductions: Number(item.totalDeductions) || 0,
+          netSalary: Number(item.netSalary) || 0,
           
           status: 'published',
           generatedAt: new Date().toISOString()
@@ -246,14 +275,26 @@ export class PayrollService {
         payslips.push(payslip);
       }
 
-      // 4. Update Run Status
+      // 4. Update Run Status and actual totals
       await updateDoc(runRef, {
         status: 'locked',
+        totalGrossPayroll: totalGross,
+        totalNetPayroll: totalNet,
+        totalDeductions: totalDeductions,
         approvedBy: params.approvedBy || 'system',
+        approvedByName: params.approvedByName || 'Super Admin',
         updatedAt: new Date().toISOString()
       });
 
-      return { success: true, run: { ...run, status: 'processed' } as PayrollRun, payslips };
+      const updatedRun: PayrollRun = {
+        ...run,
+        status: 'locked',
+        totalGrossPayroll: totalGross,
+        totalNetPayroll: totalNet,
+        totalDeductions: totalDeductions,
+      };
+
+      return { success: true, run: updatedRun, payslips };
     } catch (err: any) {
       console.error('Firestore lockAndPublish error:', err.message);
       return { success: false, error: err.message };

@@ -22,6 +22,7 @@ import {
 import { formatINR, formatDate } from "@/lib/utils";
 import { exportToCSV, exportToExcel } from "@/lib/export/export-utils";
 import { useToast } from "@/components/ui/toast";
+import { Modal } from "@/components/ui/modal";
 import {
   PlayCircle,
   CheckCircle2,
@@ -36,6 +37,11 @@ import {
   ArrowRight,
   ArrowLeft,
   Sparkles,
+  Pencil,
+  FileText,
+  Receipt,
+  Save,
+  SlidersHorizontal,
 } from "lucide-react";
 
 interface PayrollProcessWizardProps {
@@ -57,6 +63,35 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
   const [payrollItems, setPayrollItems] = useState<PayrollItem[]>([]);
   const [generatedPayslips, setGeneratedPayslips] = useState<Payslip[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+
+  // Edit Payslip Details & Ref No State
+  const [editingItem, setEditingItem] = useState<PayrollItem | null>(null);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editForm, setEditForm] = useState({
+    payslipNumber: "",
+    panNumber: "",
+    bankAccountNumber: "",
+    bankName: "",
+    ifscCode: "",
+    totalWorkingDays: 30,
+    daysPresent: 30,
+    daysOnLeave: 0,
+    daysLossOfPay: 0,
+    basicSalary: 0,
+    hra: 0,
+    conveyanceAllowance: 0,
+    medicalAllowance: 0,
+    specialAllowance: 0,
+    performanceBonus: 0,
+    overtimePay: 0,
+    otherEarnings: 0,
+    providentFund: 0,
+    esi: 0,
+    professionalTax: 0,
+    incomeTaxTDS: 0,
+    lossOfPayDeduction: 0,
+    otherDeductions: 0,
+  });
 
   // Month change
   const handleMonthChange = (m: number) => {
@@ -95,6 +130,114 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  // Open Edit Modal for a Specific Employee's Payslip Details & Ref No
+  const handleOpenEdit = (item: PayrollItem) => {
+    setEditingItem(item);
+    setEditForm({
+      payslipNumber: item.payslipNumber || item.refNo || "",
+      panNumber: item.panNumber || "",
+      bankAccountNumber: item.bankAccountNumber || "",
+      bankName: item.bankName || "",
+      ifscCode: item.ifscCode || "",
+      totalWorkingDays: item.totalWorkingDays ?? 30,
+      daysPresent: item.daysPresent ?? 30,
+      daysOnLeave: item.daysOnLeave ?? 0,
+      daysLossOfPay: item.daysLossOfPay ?? 0,
+      basicSalary: item.basicSalary ?? 0,
+      hra: item.hra ?? 0,
+      conveyanceAllowance: item.conveyanceAllowance ?? 0,
+      medicalAllowance: item.medicalAllowance ?? 0,
+      specialAllowance: item.specialAllowance ?? 0,
+      performanceBonus: item.performanceBonus ?? 0,
+      overtimePay: item.overtimePay ?? 0,
+      otherEarnings: item.otherEarnings ?? 0,
+      providentFund: item.providentFund ?? 0,
+      esi: item.esi ?? 0,
+      professionalTax: item.professionalTax ?? 0,
+      incomeTaxTDS: item.incomeTaxTDS ?? 0,
+      lossOfPayDeduction: item.lossOfPayDeduction ?? 0,
+      otherDeductions: item.otherDeductions ?? 0,
+    });
+    setIsEditModalOpen(true);
+  };
+
+  // Save Item Edit and Recalculate Run Totals
+  const handleSaveItemEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingItem) return;
+
+    const gross =
+      Number(editForm.basicSalary) +
+      Number(editForm.hra) +
+      Number(editForm.conveyanceAllowance) +
+      Number(editForm.medicalAllowance) +
+      Number(editForm.specialAllowance) +
+      Number(editForm.performanceBonus) +
+      Number(editForm.overtimePay) +
+      Number(editForm.otherEarnings);
+
+    const deductions =
+      Number(editForm.providentFund) +
+      Number(editForm.esi) +
+      Number(editForm.professionalTax) +
+      Number(editForm.incomeTaxTDS) +
+      Number(editForm.lossOfPayDeduction) +
+      Number(editForm.otherDeductions);
+
+    const net = gross - deductions;
+
+    const updatedItem: PayrollItem = {
+      ...editingItem,
+      payslipNumber: editForm.payslipNumber.trim() || editingItem.payslipNumber,
+      refNo: editForm.payslipNumber.trim() || editingItem.refNo,
+      panNumber: editForm.panNumber.trim().toUpperCase(),
+      bankAccountNumber: editForm.bankAccountNumber.trim(),
+      bankName: editForm.bankName.trim(),
+      ifscCode: editForm.ifscCode.trim().toUpperCase(),
+      totalWorkingDays: Number(editForm.totalWorkingDays),
+      daysPresent: Number(editForm.daysPresent),
+      daysOnLeave: Number(editForm.daysOnLeave),
+      daysLossOfPay: Number(editForm.daysLossOfPay),
+      basicSalary: Number(editForm.basicSalary),
+      hra: Number(editForm.hra),
+      conveyanceAllowance: Number(editForm.conveyanceAllowance),
+      medicalAllowance: Number(editForm.medicalAllowance),
+      specialAllowance: Number(editForm.specialAllowance),
+      performanceBonus: Number(editForm.performanceBonus),
+      overtimePay: Number(editForm.overtimePay),
+      otherEarnings: Number(editForm.otherEarnings),
+      grossSalary: gross,
+      providentFund: Number(editForm.providentFund),
+      esi: Number(editForm.esi),
+      professionalTax: Number(editForm.professionalTax),
+      incomeTaxTDS: Number(editForm.incomeTaxTDS),
+      lossOfPayDeduction: Number(editForm.lossOfPayDeduction),
+      otherDeductions: Number(editForm.otherDeductions),
+      totalDeductions: deductions,
+      netSalary: net,
+    };
+
+    const updatedList = payrollItems.map((item) => (item.id === editingItem.id ? updatedItem : item));
+    setPayrollItems(updatedList);
+
+    // Recalculate run totals
+    const totalGross = updatedList.reduce((sum, it) => sum + (Number(it.grossSalary) || 0), 0);
+    const totalDeductions = updatedList.reduce((sum, it) => sum + (Number(it.totalDeductions) || 0), 0);
+    const totalNet = updatedList.reduce((sum, it) => sum + (Number(it.netSalary) || 0), 0);
+
+    if (generatedRun) {
+      setGeneratedRun({
+        ...generatedRun,
+        totalGrossPayroll: totalGross,
+        totalDeductions,
+        totalNetPayroll: totalNet,
+      });
+    }
+
+    setIsEditModalOpen(false);
+    success("Payslip Updated", `Updated compensation & Ref No (${updatedItem.payslipNumber}) for ${editingItem.employeeName}`);
   };
 
   // Step 4 -> 5: Lock Payroll & Generate Payslips
@@ -332,37 +475,55 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
             </div>
 
             {/* Detailed Table */}
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Employee</TableHead>
-                  <TableHead>Basic</TableHead>
-                  <TableHead>HRA</TableHead>
-                  <TableHead>Allowances</TableHead>
-                  <TableHead>Gross</TableHead>
-                  <TableHead>PF (12%)</TableHead>
-                  <TableHead>PT / TDS</TableHead>
-                  <TableHead>Net Salary</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {payrollItems.map((item) => (
-                  <TableRow key={item.id}>
-                    <TableCell>
-                      <span className="font-bold text-slate-900 dark:text-slate-100 block">{item.employeeName}</span>
-                      <span className="text-[10px] text-slate-400 font-mono">{item.employeeCode}</span>
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">{formatINR(item.basicSalary)}</TableCell>
-                    <TableCell className="font-mono text-xs">{formatINR(item.hra)}</TableCell>
-                    <TableCell className="font-mono text-xs">{formatINR(item.specialAllowance + item.conveyanceAllowance + item.medicalAllowance)}</TableCell>
-                    <TableCell className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">{formatINR(item.grossSalary)}</TableCell>
-                    <TableCell className="font-mono text-xs text-rose-600">{formatINR(item.providentFund)}</TableCell>
-                    <TableCell className="font-mono text-xs text-rose-600">{formatINR(item.professionalTax + item.incomeTaxTDS)}</TableCell>
-                    <TableCell className="font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">{formatINR(item.netSalary)}</TableCell>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Employee</TableHead>
+                    <TableHead>Payslip Ref No</TableHead>
+                    <TableHead>Basic</TableHead>
+                    <TableHead>HRA</TableHead>
+                    <TableHead>Allowances</TableHead>
+                    <TableHead>Gross</TableHead>
+                    <TableHead>PF / Deductions</TableHead>
+                    <TableHead>Net Salary</TableHead>
+                    <TableHead className="text-right">Action</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {payrollItems.map((item) => (
+                    <TableRow key={item.id}>
+                      <TableCell>
+                        <span className="font-bold text-slate-900 dark:text-slate-100 block">{item.employeeName}</span>
+                        <span className="text-[10px] text-slate-400 font-mono">{item.employeeCode}</span>
+                      </TableCell>
+                      <TableCell>
+                        <span className="font-mono text-xs px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 font-semibold text-slate-700 dark:text-slate-300">
+                          {item.payslipNumber || item.refNo || "Auto"}
+                        </span>
+                      </TableCell>
+                      <TableCell className="font-mono text-xs">{formatINR(item.basicSalary)}</TableCell>
+                      <TableCell className="font-mono text-xs">{formatINR(item.hra)}</TableCell>
+                      <TableCell className="font-mono text-xs">{formatINR((item.specialAllowance || 0) + (item.conveyanceAllowance || 0) + (item.medicalAllowance || 0) + (item.performanceBonus || 0) + (item.overtimePay || 0))}</TableCell>
+                      <TableCell className="font-mono text-xs font-bold text-slate-900 dark:text-slate-100">{formatINR(item.grossSalary)}</TableCell>
+                      <TableCell className="font-mono text-xs text-rose-600">{formatINR(item.totalDeductions)}</TableCell>
+                      <TableCell className="font-mono text-xs font-black text-emerald-600 dark:text-emerald-400">{formatINR(item.netSalary)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenEdit(item)}
+                          leftIcon={<Pencil className="w-3.5 h-3.5 text-coral-600" />}
+                          className="text-xs"
+                        >
+                          Edit
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
           <CardFooter className="flex justify-between bg-slate-50/50 dark:bg-slate-900/50">
             <Button variant="outline" size="sm" onClick={() => setStep(2)} leftIcon={<ArrowLeft className="w-4 h-4" />}>
@@ -473,6 +634,262 @@ export function PayrollProcessWizard({ employees }: PayrollProcessWizardProps) {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* EDIT PAYSLIP & REF NO MODAL */}
+      {editingItem && (
+        <Modal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          title={`Edit Payslip & Ref No: ${editingItem.employeeName}`}
+          description={`Customize salary components, deductions, Ref No, and PAN before generating final payslip`}
+          maxWidth="3xl"
+        >
+          <form onSubmit={handleSaveItemEdit} className="space-y-5">
+            {/* Live Calculation Banner */}
+            {(() => {
+              const liveGross =
+                Number(editForm.basicSalary) +
+                Number(editForm.hra) +
+                Number(editForm.conveyanceAllowance) +
+                Number(editForm.medicalAllowance) +
+                Number(editForm.specialAllowance) +
+                Number(editForm.performanceBonus) +
+                Number(editForm.overtimePay) +
+                Number(editForm.otherEarnings);
+
+              const liveDeductions =
+                Number(editForm.providentFund) +
+                Number(editForm.esi) +
+                Number(editForm.professionalTax) +
+                Number(editForm.incomeTaxTDS) +
+                Number(editForm.lossOfPayDeduction) +
+                Number(editForm.otherDeductions);
+
+              const liveNet = liveGross - liveDeductions;
+
+              return (
+                <div className="p-4 rounded-2xl bg-gradient-to-r from-slate-900 to-slate-800 text-white grid grid-cols-3 gap-3 text-center">
+                  <div>
+                    <span className="text-[10px] uppercase text-slate-400 font-bold">Calculated Gross</span>
+                    <p className="text-base font-bold font-mono text-white mt-0.5">{formatINR(liveGross)}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase text-slate-400 font-bold">Total Deductions</span>
+                    <p className="text-base font-bold font-mono text-rose-400 mt-0.5">{formatINR(liveDeductions)}</p>
+                  </div>
+                  <div>
+                    <span className="text-[10px] uppercase text-coral-400 font-bold">Net Payable</span>
+                    <p className="text-base font-black font-mono text-emerald-400 mt-0.5">{formatINR(liveNet)}</p>
+                  </div>
+                </div>
+              );
+            })()}
+
+            {/* Document Reference & Identity Section */}
+            <div className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Receipt className="w-3.5 h-3.5 text-coral-500" />
+                <span>Document Reference & Employee Info</span>
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Input
+                  label="Payslip Ref No / Doc ID"
+                  required
+                  value={editForm.payslipNumber}
+                  onChange={(e) => setEditForm({ ...editForm, payslipNumber: e.target.value })}
+                  placeholder="e.g. CGG-PS-2026-08-0001"
+                  helperText="Customizable reference number printed on payslip"
+                />
+                <Input
+                  label="Employee PAN Number"
+                  value={editForm.panNumber}
+                  onChange={(e) => setEditForm({ ...editForm, panNumber: e.target.value.toUpperCase() })}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
+                />
+                <Input
+                  label="Bank Account Number"
+                  value={editForm.bankAccountNumber}
+                  onChange={(e) => setEditForm({ ...editForm, bankAccountNumber: e.target.value })}
+                  placeholder="e.g. 50100123456789"
+                />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Input
+                  label="Bank Name"
+                  value={editForm.bankName}
+                  onChange={(e) => setEditForm({ ...editForm, bankName: e.target.value })}
+                  placeholder="HDFC Bank"
+                />
+                <Input
+                  label="Bank IFSC Code"
+                  value={editForm.ifscCode}
+                  onChange={(e) => setEditForm({ ...editForm, ifscCode: e.target.value.toUpperCase() })}
+                  placeholder="HDFC0000240"
+                />
+              </div>
+            </div>
+
+            {/* Attendance Days Section */}
+            <div className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <Calendar className="w-3.5 h-3.5 text-blue-500" />
+                <span>Attendance & Work Days</span>
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Input
+                  label="Working Days"
+                  type="number"
+                  value={editForm.totalWorkingDays}
+                  onChange={(e) => setEditForm({ ...editForm, totalWorkingDays: Number(e.target.value) })}
+                />
+                <Input
+                  label="Days Present"
+                  type="number"
+                  value={editForm.daysPresent}
+                  onChange={(e) => setEditForm({ ...editForm, daysPresent: Number(e.target.value) })}
+                />
+                <Input
+                  label="Paid Leaves"
+                  type="number"
+                  value={editForm.daysOnLeave}
+                  onChange={(e) => setEditForm({ ...editForm, daysOnLeave: Number(e.target.value) })}
+                />
+                <Input
+                  label="Loss of Pay Days"
+                  type="number"
+                  value={editForm.daysLossOfPay}
+                  onChange={(e) => setEditForm({ ...editForm, daysLossOfPay: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            {/* Earnings Components Section */}
+            <div className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <CreditCard className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Earnings Breakdown (INR)</span>
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Input
+                  label="Basic Salary"
+                  type="number"
+                  value={editForm.basicSalary}
+                  onChange={(e) => setEditForm({ ...editForm, basicSalary: Number(e.target.value) })}
+                />
+                <Input
+                  label="HRA"
+                  type="number"
+                  value={editForm.hra}
+                  onChange={(e) => setEditForm({ ...editForm, hra: Number(e.target.value) })}
+                />
+                <Input
+                  label="Conveyance Allowance"
+                  type="number"
+                  value={editForm.conveyanceAllowance}
+                  onChange={(e) => setEditForm({ ...editForm, conveyanceAllowance: Number(e.target.value) })}
+                />
+                <Input
+                  label="Medical Allowance"
+                  type="number"
+                  value={editForm.medicalAllowance}
+                  onChange={(e) => setEditForm({ ...editForm, medicalAllowance: Number(e.target.value) })}
+                />
+                <Input
+                  label="Special Allowance"
+                  type="number"
+                  value={editForm.specialAllowance}
+                  onChange={(e) => setEditForm({ ...editForm, specialAllowance: Number(e.target.value) })}
+                />
+                <Input
+                  label="Performance Bonus"
+                  type="number"
+                  value={editForm.performanceBonus}
+                  onChange={(e) => setEditForm({ ...editForm, performanceBonus: Number(e.target.value) })}
+                />
+                <Input
+                  label="Overtime Pay"
+                  type="number"
+                  value={editForm.overtimePay}
+                  onChange={(e) => setEditForm({ ...editForm, overtimePay: Number(e.target.value) })}
+                />
+                <Input
+                  label="Other Earnings"
+                  type="number"
+                  value={editForm.otherEarnings}
+                  onChange={(e) => setEditForm({ ...editForm, otherEarnings: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            {/* Deductions & Statutory Taxes Section */}
+            <div className="space-y-3 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/40 border border-slate-200 dark:border-slate-800">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
+                <SlidersHorizontal className="w-3.5 h-3.5 text-rose-500" />
+                <span>Deductions & Statutory Taxes (INR)</span>
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                <Input
+                  label="Provident Fund (PF)"
+                  type="number"
+                  value={editForm.providentFund}
+                  onChange={(e) => setEditForm({ ...editForm, providentFund: Number(e.target.value) })}
+                />
+                <Input
+                  label="Employee ESI"
+                  type="number"
+                  value={editForm.esi}
+                  onChange={(e) => setEditForm({ ...editForm, esi: Number(e.target.value) })}
+                />
+                <Input
+                  label="Professional Tax (PT)"
+                  type="number"
+                  value={editForm.professionalTax}
+                  onChange={(e) => setEditForm({ ...editForm, professionalTax: Number(e.target.value) })}
+                />
+                <Input
+                  label="TDS / Income Tax"
+                  type="number"
+                  value={editForm.incomeTaxTDS}
+                  onChange={(e) => setEditForm({ ...editForm, incomeTaxTDS: Number(e.target.value) })}
+                />
+                <Input
+                  label="Loss of Pay (LOP) Deduction"
+                  type="number"
+                  value={editForm.lossOfPayDeduction}
+                  onChange={(e) => setEditForm({ ...editForm, lossOfPayDeduction: Number(e.target.value) })}
+                />
+                <Input
+                  label="Other Deductions"
+                  type="number"
+                  value={editForm.otherDeductions}
+                  onChange={(e) => setEditForm({ ...editForm, otherDeductions: Number(e.target.value) })}
+                />
+              </div>
+            </div>
+
+            {/* Modal Footer Actions */}
+            <div className="flex justify-end gap-2.5 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => setIsEditModalOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                variant="coral"
+                size="sm"
+                leftIcon={<Save className="w-4 h-4" />}
+              >
+                Apply Changes to Run
+              </Button>
+            </div>
+          </form>
+        </Modal>
       )}
     </div>
   );
