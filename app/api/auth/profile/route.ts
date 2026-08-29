@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
 import { collection, getDocs, query, where } from 'firebase/firestore';
-import { serverDb } from '@/lib/server/server-db';
 import { Employee, UserRole } from '@/types';
 
 export async function GET(request: Request) {
@@ -33,19 +32,13 @@ export async function GET(request: Request) {
 
     let foundEmployee: Employee | null = null;
 
-    // 2. Check persistent Server Database first
-    if (email) {
-      foundEmployee = serverDb.getEmployeeByEmail(email);
-    }
-
-    // 3. Query Firestore employees collection via Admin SDK if not found
+    // 1. Query Firestore employees collection via Admin SDK if not found
     if (!foundEmployee && adminDb && typeof adminDb.collection === 'function') {
       try {
         if (email) {
           const empSnap = await adminDb.collection('employees').where('email', '==', email).get();
           if (!empSnap.empty) {
             foundEmployee = empSnap.docs[0].data() as Employee;
-            serverDb.saveEmployee(foundEmployee);
           }
         }
         if (!foundEmployee && uid) {
@@ -56,7 +49,6 @@ export async function GET(request: Request) {
               const empDoc = await adminDb.collection('employees').doc(uData.employeeId).get();
               if (empDoc.exists) {
                 foundEmployee = empDoc.data() as Employee;
-                serverDb.saveEmployee(foundEmployee);
               }
             }
           }
@@ -66,14 +58,13 @@ export async function GET(request: Request) {
       }
     }
 
-    // 4. Query Client Firestore if not found
+    // 2. Query Client Firestore if not found
     if (!foundEmployee && db && email) {
       try {
         const q = query(collection(db, 'employees'), where('email', '==', email));
         const snap = await getDocs(q);
         if (!snap.empty) {
           foundEmployee = snap.docs[0].data() as Employee;
-          serverDb.saveEmployee(foundEmployee);
         }
       } catch (err: any) {
         console.warn('Client Firestore profile lookup notice:', err.message);

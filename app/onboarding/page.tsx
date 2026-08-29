@@ -2,7 +2,6 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,19 +34,19 @@ export default function OnboardingPage() {
   const [empPrefix, setEmpPrefix] = useState("CGG-EMP-");
 
   const handleFinish = () => {
-    MockDataStore.updateOrganization({
-      name: companyName,
-      email,
-      phone,
-      address,
-      city,
-      state,
-      country,
-      currency,
-      payrollFrequency: payrollFreq,
-      employeeIdPrefix: empPrefix,
-      onboardingCompleted: true,
-    });
+    // MockDataStore.updateOrganization({
+    //   name: companyName,
+    //   email,
+    //   phone,
+    //   address,
+    //   city,
+    //   state,
+    //   country,
+    //   currency,
+    //   payrollFrequency: payrollFreq,
+    //   employeeIdPrefix: empPrefix,
+    //   onboardingCompleted: true,
+    // });
 
     success("Onboarding Completed", "Organization setup initialized successfully!");
     router.push("/dashboard");

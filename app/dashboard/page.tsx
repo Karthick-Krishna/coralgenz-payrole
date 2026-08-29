@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth/auth-context";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
+import { DepartmentService } from "@/lib/firebase/department-service";
+import { HolidayService } from "@/lib/firebase/holiday-service";
 import { PayrollService } from "@/lib/firebase/payroll-service";
 import { AttendanceService } from "@/lib/firebase/attendance-service";
 import { LeaveService } from "@/lib/firebase/leave-service";
@@ -46,21 +47,14 @@ export default function DashboardPage() {
     if (isInitial) setIsLoading(true);
     try {
       if (currentRole === "employee") {
-        let emp: Employee | null = null;
-        if (user?.employeeId) {
-          emp = await EmployeeService.getEmployeeById(user.employeeId);
-        }
-        if (!emp && user?.email) {
-          const allEmps = await EmployeeService.getEmployees();
-          emp = allEmps.find((e) => e.email?.toLowerCase() === user.email?.toLowerCase()) || null;
-        }
-
-        const empId = emp?.id || user?.employeeId || "";
-        const [leaves, annList, psList, att] = await Promise.all([
+        const empId = user?.employeeId;
+        const [emp, leaves, annList, psList, att, holidays] = await Promise.all([
+          EmployeeService.getEmployeeById(empId || ""),
           LeaveService.getLeaves(empId || undefined),
           AnnouncementService.getAnnouncements(),
           PayrollService.getPayslips(empId || undefined),
-          AttendanceService.getAttendance(empId || undefined)
+          AttendanceService.getAttendance(empId || undefined),
+          HolidayService.getHolidays()
         ]);
         
         if (emp) setEmployees([emp]);
@@ -68,7 +62,7 @@ export default function DashboardPage() {
         if (leaves.balance) setLeaveBalances([leaves.balance]);
         setAnnouncements(annList);
         setPayslips(psList.filter(p => !empId || p.employeeId === empId));
-        setHolidays(MockDataStore.getHolidays());
+        setHolidays(holidays);
         setAttendance(att);
       } else {
         const [
@@ -79,6 +73,8 @@ export default function DashboardPage() {
           annList,
           psList,
           logs,
+          depts,
+          holidays
         ] = await Promise.all([
           EmployeeService.getEmployees(),
           PayrollService.getPayrollRuns(),
@@ -87,6 +83,8 @@ export default function DashboardPage() {
           AnnouncementService.getAnnouncements(),
           PayrollService.getPayslips(),
           AuditService.getLogs(),
+          DepartmentService.getDepartments(),
+          HolidayService.getHolidays()
         ]);
 
         setEmployees(emps);
@@ -97,8 +95,8 @@ export default function DashboardPage() {
         setAnnouncements(annList);
         setPayslips(psList);
         setAuditLogs(logs as any[]);
-        setDepartments(MockDataStore.getDepartments());
-        setHolidays(MockDataStore.getHolidays());
+        setDepartments(depts);
+        setHolidays(holidays);
       }
     } catch (e) {
       console.error("Error loading dashboard server data:", e);

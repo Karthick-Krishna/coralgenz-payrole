@@ -5,8 +5,9 @@ import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { EmployeeProfile } from "@/components/employees/employee-profile";
 import { EmployeeForm } from "@/components/employees/employee-form";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
+import { DepartmentService } from "@/lib/firebase/department-service";
+import { DesignationService } from "@/lib/firebase/designation-service";
 import { Employee, Department, Designation } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
@@ -27,12 +28,17 @@ function EmployeeDetailContent() {
   const loadData = async () => {
     if (!id) return;
     setIsLoading(true);
-    const emp = await EmployeeService.getEmployeeById(id);
-    const emps = await EmployeeService.getEmployees();
+    const [emp, emps, depts, desigs] = await Promise.all([
+      EmployeeService.getEmployeeById(id),
+      EmployeeService.getEmployees(),
+      DepartmentService.getDepartments(),
+      DesignationService.getDesignations()
+    ]);
+    
     setEmployee(emp || null);
     setAllEmployees(emps);
-    setDepartments(MockDataStore.getDepartments());
-    setDesignations(MockDataStore.getDesignations());
+    setDepartments(depts);
+    setDesignations(desigs);
     setIsLoading(false);
   };
 

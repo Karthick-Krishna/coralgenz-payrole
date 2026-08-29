@@ -4,8 +4,9 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { EmployeeForm } from "@/components/employees/employee-form";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
+import { DepartmentService } from "@/lib/firebase/department-service";
+import { DesignationService } from "@/lib/firebase/designation-service";
 import { Employee, Department, Designation } from "@/types";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
 
@@ -14,14 +15,19 @@ function EmployeeFormContent() {
   const editId = searchParams?.get("editId");
 
   const [initialData, setInitialData] = useState<Employee | undefined>(undefined);
-  const [departments, setDepartments] = useState<Department[]>(() => MockDataStore.getDepartments());
-  const [designations, setDesignations] = useState<Designation[]>(() => MockDataStore.getDesignations());
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [designations, setDesignations] = useState<Designation[]>([]);
   const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
 
   const loadData = async () => {
-    setDepartments(MockDataStore.getDepartments());
-    setDesignations(MockDataStore.getDesignations());
-    const emps = await EmployeeService.getEmployees();
+    const [emps, depts, desigs] = await Promise.all([
+      EmployeeService.getEmployees(),
+      DepartmentService.getDepartments(),
+      DesignationService.getDesignations()
+    ]);
+    
+    setDepartments(depts);
+    setDesignations(desigs);
     setAllEmployees(emps);
 
     if (editId) {

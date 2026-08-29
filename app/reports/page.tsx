@@ -7,7 +7,7 @@ import { EmployeeService } from "@/lib/firebase/employee-service";
 import { PayrollService } from "@/lib/firebase/payroll-service";
 import { AttendanceService } from "@/lib/firebase/attendance-service";
 import { LeaveService } from "@/lib/firebase/leave-service";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { DepartmentService } from "@/lib/firebase/department-service";
 import {
   Employee,
   PayrollRun,
@@ -37,7 +37,8 @@ export default function ReportsPage() {
       setPayrollRuns(runs);
       setAttendance(att);
       setLeaveRequests(leaves.requests);
-      setDepartments(MockDataStore.getDepartments());
+      const depts = await DepartmentService.getDepartments();
+      setDepartments(depts);
     } catch (e) {
       console.error("Error loading reports data:", e);
     } finally {

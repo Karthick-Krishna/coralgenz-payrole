@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { SalaryStructure, StatutoryRulesConfig } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";

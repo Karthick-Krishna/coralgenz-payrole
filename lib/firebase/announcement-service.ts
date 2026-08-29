@@ -1,68 +1,64 @@
-import { collection, doc, getDocs, setDoc, deleteDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
 import { Announcement } from '@/types';
 
 export class AnnouncementService {
+  private static collectionName = 'announcements';
+
   public static async getAnnouncements(): Promise<Announcement[]> {
+    if (!isFirebaseConfigured || !db) return [];
+
     try {
-      const res = await fetch('/api/announcements', { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data.announcements)) {
-          return data.announcements;
-        }
-      }
-    } catch {}
-
-    if (isFirebaseConfigured && db) {
-      try {
-        const snap = await getDocs(collection(db, 'announcements'));
-        const list: Announcement[] = [];
-        snap.forEach((d) => list.push(d.data() as Announcement));
-        return list.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
-      } catch {}
+      const snap = await getDocs(collection(db, this.collectionName));
+      const list: Announcement[] = [];
+      snap.forEach((d) => list.push({ ...d.data(), id: d.id } as Announcement));
+      return list.sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime());
+    } catch (error: any) {
+      console.error('Firestore getAnnouncements error:', error.message);
+      return [];
     }
-
-    return [];
   }
 
   public static async addAnnouncement(ann: Partial<Announcement>): Promise<boolean> {
+    if (!isFirebaseConfigured || !db) return false;
+
     try {
-      const res = await fetch('/api/announcements', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...ann,
-          publishedAt: ann.publishedAt || new Date().toISOString(),
-        }),
+      const id = ann.id || `ann-${Date.now()}`;
+      const payload = cleanFirestoreData({ 
+        ...ann, 
+        id, 
+        publishedAt: ann.publishedAt || new Date().toISOString() 
       });
-      return res.ok;
-    } catch {
-      if (isFirebaseConfigured && db) {
-        try {
-          const id = ann.id || `ann-${Date.now()}`;
-          await setDoc(doc(db, 'announcements', id), cleanFirestoreData({ ...ann, id, publishedAt: ann.publishedAt || new Date().toISOString() }), { merge: true });
-          return true;
-        } catch {}
-      }
+      
+      await setDoc(doc(db, this.collectionName, id), payload);
+      return true;
+    } catch (error: any) {
+      console.error('Firestore addAnnouncement error:', error.message);
+      return false;
+    }
+  }
+
+  public static async updateAnnouncement(id: string, updates: Partial<Announcement>): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+
+    try {
+      await updateDoc(doc(db, this.collectionName, id), cleanFirestoreData(updates));
+      return true;
+    } catch (error: any) {
+      console.error('Firestore updateAnnouncement error:', error.message);
       return false;
     }
   }
 
   public static async deleteAnnouncement(id: string): Promise<boolean> {
+    if (!id || !isFirebaseConfigured || !db) return false;
+
     try {
-      const res = await fetch(`/api/announcements?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-      return res.ok;
-    } catch {
-      if (isFirebaseConfigured && db) {
-        try {
-          await deleteDoc(doc(db, 'announcements', id));
-          return true;
-        } catch {}
-      }
+      await deleteDoc(doc(db, this.collectionName, id));
+      return true;
+    } catch (error: any) {
+      console.error('Firestore deleteAnnouncement error:', error.message);
       return false;
     }
   }

@@ -4,7 +4,8 @@ import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { NotificationService } from "@/lib/firebase/notification-service";
+import { AttendanceService } from "@/lib/firebase/attendance-service";
 import { NotificationItem } from "@/types";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { Badge } from "@/components/ui/badge";
@@ -39,15 +40,15 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
   const profileRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const loadNotifs = () => {
-      const all = MockDataStore.getNotifications(user?.id);
+    const loadNotifs = async () => {
+      const all = await NotificationService.getNotifications(user?.id);
       setNotifications(all);
 
       // Check today's attendance for current user
       if (user?.employeeId) {
         const today = new Date().toISOString().split("T")[0];
-        const att = MockDataStore.getAttendance(today);
-        const myAtt = att.find((a) => a.employeeId === user.employeeId);
+        const att = await AttendanceService.getAttendance(user.employeeId);
+        const myAtt = att.find((a) => a.date === today);
         setTodayCheckedIn(Boolean(myAtt?.checkIn && !myAtt?.checkOut));
       }
     };
@@ -73,25 +74,39 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const handleMarkAllRead = () => {
-    MockDataStore.markAllNotificationsRead();
+  const handleMarkAllRead = async () => {
+    if (user?.id) {
+      await NotificationService.markAllAsRead(user.id);
+      const updated = await NotificationService.getNotifications(user.id);
+      setNotifications(updated);
+    }
   };
 
-  const handleQuickCheckIn = () => {
+  const handleQuickCheckIn = async () => {
     if (!user?.employeeId) {
       router.push("/attendance");
       return;
     }
+    
+    const today = new Date().toISOString().split("T")[0];
+    const time = new Date().toISOString();
+    
     if (todayCheckedIn) {
-      MockDataStore.recordCheckOut(user.employeeId);
+      await AttendanceService.logAttendance({
+         employeeId: user.employeeId,
+         date: today,
+         checkOut: time,
+         status: 'present'
+      });
       setTodayCheckedIn(false);
     } else {
-      MockDataStore.recordCheckIn(
-        user.employeeId,
-        user.displayName,
-        "dept-01",
-        "office"
-      );
+      await AttendanceService.logAttendance({
+         employeeId: user.employeeId,
+         employeeName: user.displayName,
+         date: today,
+         checkIn: time,
+         status: 'present'
+      });
       setTodayCheckedIn(true);
     }
   };
@@ -181,8 +196,8 @@ export function Header({ onOpenMobileMenu, onOpenSearch }: HeaderProps) {
                   notifications.map((notif) => (
                     <div
                       key={notif.id}
-                      onClick={() => {
-                        MockDataStore.markNotificationRead(notif.id);
+                      onClick={async () => {
+                        await NotificationService.markAsRead(notif.id);
                         if (notif.link) router.push(notif.link);
                         setShowNotifications(false);
                       }}

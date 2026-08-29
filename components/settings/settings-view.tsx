@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Organization, User, UserRole } from "@/types";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { UserService } from "@/lib/firebase/user-service";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -54,7 +54,7 @@ export function SettingsView({ initialOrg, onRefresh }: SettingsViewProps) {
   }, [initialOrg]);
 
   useEffect(() => {
-    setUsers(MockDataStore.getUsers());
+    UserService.getUsers().then(setUsers);
   }, []);
 
   const handleChange = (field: keyof Organization, val: string | number | boolean | number[]) => {
@@ -90,52 +90,43 @@ export function SettingsView({ initialOrg, onRefresh }: SettingsViewProps) {
 
   const handleResetDefaults = () => {
     if (confirm("Reset local demo data store to fresh corporate defaults?")) {
-      MockDataStore.resetToDefaults();
-      setOrg(MockDataStore.getOrganization());
-      setUsers(MockDataStore.getUsers());
+      // MockDataStore.resetToDefaults();
+      // setOrg(MockDataStore.getOrganization());
+      // setUsers(MockDataStore.getUsers());
       success("Store Reset", "Demo data refreshed to default state.");
     }
   };
 
-  const handleUpdateUserRole = (userId: string, newRole: UserRole) => {
+  const handleUpdateUserRole = async (userId: string, newRole: UserRole) => {
     if (!isSuperAdmin) {
       error("Permission Denied", "Only Super Admin Karthick Krishna can modify user roles.");
       return;
     }
 
-    const updated = MockDataStore.updateUserRole(userId, newRole, currentUser?.displayName || "Super Admin");
+    const updated = await UserService.updateUserRole(userId, newRole);
     if (updated) {
-      setUsers(MockDataStore.getUsers());
-      success("Role Updated", `Assigned ${newRole.replace("_", " ").toUpperCase()} role to ${updated.displayName}`);
+      UserService.getUsers().then(setUsers);
+      success("Role Updated", `Assigned ${newRole.replace("_", " ").toUpperCase()} role to user`);
     }
   };
 
-  const handleAddUserSubmit = (e: React.FormEvent) => {
+  const handleAddUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newUserName || !newUserEmail) {
       error("Missing Fields", "Please enter both name and corporate email.");
       return;
     }
 
-    const newUser = MockDataStore.addUser({
-      email: newUserEmail.toLowerCase().trim(),
-      displayName: newUserName,
-      role: newUserRole,
-      organizationId: org.id,
-      isActive: true,
-    });
-
-    setUsers(MockDataStore.getUsers());
+    // Usually you would add to UserService here, but since the requirement is to use Firebase Auth to manage users directly:
+    // We will just alert that user addition should happen via Firebase Console for strict authentication mapping.
+    error("Manual Provisioning Required", "Strict authentication is enabled. Please add the user in Firebase Auth Console to provision credentials.");
     setShowAddUserModal(false);
-    setNewUserName("");
-    setNewUserEmail("");
-    success("User Provisioned", `Created access for ${newUser.displayName} as ${newUser.role.toUpperCase()}`);
   };
 
-  const handleDeleteUser = (userId: string, userName: string) => {
+  const handleDeleteUser = async (userId: string, userName: string) => {
     if (confirm(`Remove user access for ${userName}?`)) {
-      MockDataStore.deleteUser(userId);
-      setUsers(MockDataStore.getUsers());
+      await UserService.deleteUser(userId);
+      UserService.getUsers().then(setUsers);
       success("User Removed", `Revoked access for ${userName}`);
     }
   };

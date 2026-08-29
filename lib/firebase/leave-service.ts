@@ -1,77 +1,62 @@
-import { collection, doc, getDocs, getDoc, setDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, query, where, updateDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
 import { LeaveRequest, LeaveBalance } from '@/types';
 
 export class LeaveService {
+  private static reqCollectionName = 'leaveRequests';
+  private static balCollectionName = 'leaveBalances';
+
   public static async getLeaves(employeeId?: string): Promise<{ requests: LeaveRequest[]; balance: LeaveBalance | null }> {
+    if (!isFirebaseConfigured || !db) return { requests: [], balance: null };
+
     try {
-      const url = employeeId ? `/api/leave?employeeId=${encodeURIComponent(employeeId)}` : '/api/leave';
-      const res = await fetch(url, { cache: 'no-store' });
-      if (res.ok) {
-        const data = await res.json();
-        return { requests: data.requests || [], balance: data.balance || null };
+      let q = query(collection(db, this.reqCollectionName));
+      if (employeeId) {
+        q = query(collection(db, this.reqCollectionName), where('employeeId', '==', employeeId));
       }
-    } catch {}
+      const snap = await getDocs(q);
+      const requests: LeaveRequest[] = [];
+      snap.forEach((d) => requests.push({ ...d.data(), id: d.id } as LeaveRequest));
 
-    if (isFirebaseConfigured && db) {
-      try {
-        let q = query(collection(db, 'leaveRequests'));
-        if (employeeId) {
-          q = query(collection(db, 'leaveRequests'), where('employeeId', '==', employeeId));
+      let balance: LeaveBalance | null = null;
+      if (employeeId) {
+        const balDoc = await getDoc(doc(db, this.balCollectionName, `lb-${employeeId}-2026`));
+        if (balDoc.exists()) {
+          balance = { ...balDoc.data(), id: balDoc.id } as LeaveBalance;
         }
-        const snap = await getDocs(q);
-        const requests: LeaveRequest[] = [];
-        snap.forEach((d) => requests.push(d.data() as LeaveRequest));
+      }
 
-        let balance: LeaveBalance | null = null;
-        if (employeeId) {
-          const balDoc = await getDoc(doc(db, 'leaveBalances', `lb-${employeeId}-2026`));
-          if (balDoc.exists()) {
-            balance = balDoc.data() as LeaveBalance;
-          }
-        }
-
-        return { requests, balance };
-      } catch {}
+      return { requests, balance };
+    } catch (error: any) {
+      console.error('Firestore getLeaves error:', error.message);
+      return { requests: [], balance: null };
     }
-
-    return { requests: [], balance: null };
   }
 
   public static async submitLeaveRequest(req: Partial<LeaveRequest>): Promise<boolean> {
+    if (!isFirebaseConfigured || !db || !req.employeeId) return false;
+
     try {
-      const res = await fetch('/api/leave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'create', leaveRequest: req }),
-      });
-      return res.ok;
-    } catch {
-      if (isFirebaseConfigured && db && req.employeeId) {
-        try {
-          const id = req.id || `leave-${Date.now()}`;
-          await setDoc(doc(db, 'leaveRequests', id), cleanFirestoreData({ ...req, id }), { merge: true });
-          return true;
-        } catch {}
-      }
+      const id = req.id || `leave-${Date.now()}`;
+      const payload = cleanFirestoreData({ ...req, id });
+      
+      await setDoc(doc(db, this.reqCollectionName, id), payload, { merge: true });
+      return true;
+    } catch (error: any) {
+      console.error('Firestore submitLeaveRequest error:', error.message);
       return false;
     }
   }
 
   public static async updateLeaveStatus(requestId: string, status: string, approverNotes?: string): Promise<boolean> {
+    if (!requestId || !isFirebaseConfigured || !db) return false;
+
     try {
-      const res = await fetch('/api/leave', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update',
-          requestId,
-          updateData: { status, approverNotes },
-        }),
-      });
-      return res.ok;
-    } catch {
+      await updateDoc(doc(db, this.reqCollectionName, requestId), cleanFirestoreData({ status, approverNotes }));
+      return true;
+    } catch (error: any) {
+      console.error('Firestore updateLeaveStatus error:', error.message);
       return false;
     }
   }

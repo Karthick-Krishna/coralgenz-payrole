@@ -2,7 +2,10 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { EmployeeService } from "@/lib/firebase/employee-service";
+import { DepartmentService } from "@/lib/firebase/department-service";
+import { AnnouncementService } from "@/lib/firebase/announcement-service";
+import { PayrollService } from "@/lib/firebase/payroll-service";
 import { Employee, Department, Announcement, PayrollRun } from "@/types";
 import { Search, User, Building2, Megaphone, CreditCard, X, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -22,10 +25,19 @@ export function GlobalSearch({ isOpen, onClose }: GlobalSearchProps) {
 
   useEffect(() => {
     if (isOpen) {
-      setEmployees(MockDataStore.getEmployees());
-      setDepartments(MockDataStore.getDepartments());
-      setAnnouncements(MockDataStore.getAnnouncements());
-      setPayrollRuns(MockDataStore.getPayrollRuns());
+      const loadSearchData = async () => {
+        const [emps, depts, anns, runs] = await Promise.all([
+          EmployeeService.getEmployees(),
+          DepartmentService.getDepartments(),
+          AnnouncementService.getAnnouncements(),
+          PayrollService.getPayrollRuns()
+        ]);
+        setEmployees(emps);
+        setDepartments(depts);
+        setAnnouncements(anns);
+        setPayrollRuns(runs);
+      };
+      loadSearchData();
       setQuery("");
     }
   }, [isOpen]);

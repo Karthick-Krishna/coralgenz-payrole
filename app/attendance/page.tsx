@@ -5,7 +5,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { AttendanceTracker } from "@/components/attendance/attendance-tracker";
 import { AttendanceService } from "@/lib/firebase/attendance-service";
 import { EmployeeService } from "@/lib/firebase/employee-service";
-import { MockDataStore } from "@/lib/store/mock-store";
+import { DepartmentService } from "@/lib/firebase/department-service";
 import { AttendanceRecord, Employee, Department } from "@/types";
 
 import { useAuth } from "@/lib/auth/auth-context";
@@ -36,7 +36,8 @@ export default function AttendancePage() {
         setAttendance(att);
         setEmployees(emps);
       }
-      setDepartments(MockDataStore.getDepartments());
+      const depts = await DepartmentService.getDepartments();
+      setDepartments(depts);
     } catch (e) {
       console.error("Error loading attendance:", e);
     } finally {

@@ -3,8 +3,9 @@
 import React, { useState, useEffect } from "react";
 import { AppLayout } from "@/components/layout/app-layout";
 import { EmployeeList } from "@/components/employees/employee-list";
-import { MockDataStore } from "@/lib/store/mock-store";
 import { EmployeeService } from "@/lib/firebase/employee-service";
+import { DepartmentService } from "@/lib/firebase/department-service";
+import { DesignationService } from "@/lib/firebase/designation-service";
 import { Employee, Department, Designation } from "@/types";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -22,10 +23,14 @@ export default function EmployeesPage() {
     if (currentRole === "employee") return; // Unauthorized
     if (isInitial) setIsLoading(true);
     try {
-      const emps = await EmployeeService.getEmployees();
+      const [emps, depts, desigs] = await Promise.all([
+        EmployeeService.getEmployees(),
+        DepartmentService.getDepartments(),
+        DesignationService.getDesignations()
+      ]);
       setEmployees(emps);
-      setDepartments(MockDataStore.getDepartments());
-      setDesignations(MockDataStore.getDesignations());
+      setDepartments(depts);
+      setDesignations(desigs);
     } finally {
       if (isInitial) setIsLoading(false);
     }
