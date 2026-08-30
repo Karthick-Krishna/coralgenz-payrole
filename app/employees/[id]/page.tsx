@@ -1,44 +1,37 @@
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
-import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { AppLayout } from "@/components/layout/app-layout";
 import { EmployeeProfile } from "@/components/employees/employee-profile";
-import { EmployeeForm } from "@/components/employees/employee-form";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { DepartmentService } from "@/lib/firebase/department-service";
 import { DesignationService } from "@/lib/firebase/designation-service";
 import { Employee, Department, Designation } from "@/types";
 import { Button } from "@/components/ui/button";
 import { DashboardSkeleton } from "@/components/ui/skeleton";
-
 import { PageLogoLoader } from "@/components/ui/logo-loader";
 
 function EmployeeDetailContent() {
   const params = useParams();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const id = typeof params?.id === "string" ? params.id : "";
-  const isEditingParam = searchParams?.get("edit") === "true";
 
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [designations, setDesignations] = useState<Designation[]>([]);
-  const [allEmployees, setAllEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadData = async () => {
     if (!id) return;
     setIsLoading(true);
-    const [emp, emps, depts, desigs] = await Promise.all([
+    const [emp, depts, desigs] = await Promise.all([
       EmployeeService.getEmployeeById(id),
-      EmployeeService.getEmployees(),
       DepartmentService.getDepartments(),
-      DesignationService.getDesignations()
+      DesignationService.getDesignations(),
     ]);
     
     setEmployee(emp || null);
-    setAllEmployees(emps);
     setDepartments(depts);
     setDesignations(desigs);
     setIsLoading(false);
@@ -49,10 +42,10 @@ function EmployeeDetailContent() {
     const handleStoreUpdate = () => loadData();
     window.addEventListener("coralgenz_store_updated", handleStoreUpdate);
     return () => window.removeEventListener("coralgenz_store_updated", handleStoreUpdate);
-  }, [id, isEditingParam]);
+  }, [id]);
 
   if (isLoading) {
-    return <PageLogoLoader text="Loading Employee Profile & Salary History..." />;
+    return <PageLogoLoader text="Loading Employee Profile & Statutory Records..." />;
   }
 
   if (!employee) {
@@ -71,26 +64,6 @@ function EmployeeDetailContent() {
 
   const dept = departments.find((d) => d.id === employee.departmentId);
   const desig = designations.find((d) => d.id === employee.designationId);
-
-  if (isEditingParam) {
-    return (
-      <EmployeeForm
-        key={`edit-${employee.id}-${employee.updatedAt || ''}`}
-        initialData={employee}
-        departments={departments}
-        designations={designations}
-        allEmployees={allEmployees}
-        isEditing={true}
-        onSaved={async (savedEmp) => {
-          if (savedEmp) {
-            setEmployee(savedEmp);
-          }
-          await loadData();
-          router.replace(`/employees/${id}`);
-        }}
-      />
-    );
-  }
 
   return (
     <EmployeeProfile

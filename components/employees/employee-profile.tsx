@@ -463,15 +463,6 @@ export function EmployeeProfile({
               >
                 Remove
               </Button>
-              <Button
-                variant="coral"
-                size="sm"
-                onClick={() => router.push(`/employees/${employee.id}?edit=true`)}
-                leftIcon={<Edit className="w-3.5 h-3.5" />}
-                className="text-xs col-span-2 sm:col-span-1"
-              >
-                Edit Profile
-              </Button>
             </div>
           </div>
         </div>

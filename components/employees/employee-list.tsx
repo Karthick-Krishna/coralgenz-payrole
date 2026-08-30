@@ -20,22 +20,21 @@ import {
   TableEmptyState,
 } from "@/components/ui/table";
 import { formatINR, formatDate, getInitials } from "@/lib/utils";
-import { exportToCSV, exportToExcel } from "@/lib/export/export-utils";
+import { exportToCSV } from "@/lib/export/export-utils";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import {
   Search,
   Plus,
   Download,
-  Filter,
   Eye,
-  Edit,
   Trash2,
   AlertTriangle,
   Building2,
   Users,
-  Phone,
-  Mail,
+  Briefcase,
+  TrendingUp,
   ChevronRight,
+  ShieldAlert,
 } from "lucide-react";
 
 interface EmployeeListProps {
@@ -76,17 +75,37 @@ export function EmployeeList({
     }
   };
 
+  // Helper map for department and designation fallbacks
+  const deptMap = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach((d) => map.set(d.id, d.name));
+    return map;
+  }, [departments]);
+
+  const desigMap = useMemo(() => {
+    const map = new Map<string, string>();
+    designations.forEach((d) => map.set(d.id, d.title));
+    return map;
+  }, [designations]);
+
   // Filtering & Sorting
   const filteredEmployees = useMemo(() => {
     return employees
       .filter((emp) => {
         const query = searchQuery.toLowerCase().trim();
+        const fullName = `${emp.firstName || ""} ${emp.lastName || ""}`.toLowerCase();
+        const empId = (emp.id || "").toLowerCase();
+        const email = (emp.email || "").toLowerCase();
+        const desig = (emp.designationTitle || desigMap.get(emp.designationId || "") || "").toLowerCase();
+        const deptName = (emp.departmentName || deptMap.get(emp.departmentId || "") || "").toLowerCase();
+
         const matchesQuery =
           !query ||
-          `${emp.firstName} ${emp.lastName}`.toLowerCase().includes(query) ||
-          emp.id.toLowerCase().includes(query) ||
-          emp.email.toLowerCase().includes(query) ||
-          emp.designationTitle.toLowerCase().includes(query);
+          fullName.includes(query) ||
+          empId.includes(query) ||
+          email.includes(query) ||
+          desig.includes(query) ||
+          deptName.includes(query);
 
         const matchesDept =
           selectedDept === "all" || emp.departmentId === selectedDept;
@@ -97,31 +116,37 @@ export function EmployeeList({
       })
       .sort((a, b) => {
         if (sortBy === "name") {
-          return `${a.firstName} ${a.lastName}`.localeCompare(`${b.firstName} ${b.lastName}`);
+          const nameA = `${a.firstName || ""} ${a.lastName || ""}`.trim();
+          const nameB = `${b.firstName || ""} ${b.lastName || ""}`.trim();
+          return nameA.localeCompare(nameB);
         } else if (sortBy === "date") {
-          return new Date(b.joiningDate).getTime() - new Date(a.joiningDate).getTime();
+          return new Date(b.joiningDate || 0).getTime() - new Date(a.joiningDate || 0).getTime();
         } else if (sortBy === "salary") {
-          return b.currentMonthlyGross - a.currentMonthlyGross;
+          return (Number(b.currentMonthlyGross) || 0) - (Number(a.currentMonthlyGross) || 0);
         }
         return 0;
       });
-  }, [employees, searchQuery, selectedDept, selectedStatus, sortBy]);
+  }, [employees, searchQuery, selectedDept, selectedStatus, sortBy, deptMap, desigMap]);
+
+  // Summary Metrics
+  const activeCount = employees.filter((e) => e.status === "active").length;
+  const totalMonthlyGross = employees.reduce((sum, e) => sum + (Number(e.currentMonthlyGross) || 0), 0);
 
   const handleExportCSV = () => {
     const exportData = filteredEmployees.map((e) => ({
       "Employee ID": e.id,
-      "Full Name": `${e.firstName} ${e.lastName}`,
-      Email: e.email,
-      Phone: e.phone,
-      Department: e.departmentName,
-      Designation: e.designationTitle,
-      "Employment Type": e.employmentType,
-      Status: e.status,
-      "Joining Date": e.joiningDate,
-      "Monthly Gross (INR)": e.currentMonthlyGross,
-      "Annual CTC (INR)": e.currentAnnualCtc,
-      "Bank Name": e.bankDetails?.bankName,
-      "IFSC Code": e.bankDetails?.ifscCode,
+      "Full Name": `${e.firstName || ""} ${e.lastName || ""}`.trim(),
+      Email: e.email || "",
+      Phone: e.phone || "",
+      Department: e.departmentName || deptMap.get(e.departmentId || "") || "General",
+      Designation: e.designationTitle || desigMap.get(e.designationId || "") || "Staff",
+      "Employment Type": e.employmentType || "full_time",
+      Status: e.status || "active",
+      "Joining Date": e.joiningDate || "",
+      "Monthly Gross (INR)": e.currentMonthlyGross || 0,
+      "Annual CTC (INR)": e.currentAnnualCtc || (Number(e.currentMonthlyGross) || 0) * 12,
+      "Bank Name": e.bankDetails?.bankName || "",
+      "IFSC Code": e.bankDetails?.ifscCode || "",
     }));
     exportToCSV(exportData, "Coralgenz_Employees_Roster");
   };
@@ -137,25 +162,24 @@ export function EmployeeList({
   };
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-6">
       {/* Header with Title and Primary Actions */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100 tracking-tight">
             Employee Directory
           </h1>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-            {filteredEmployees.length} total staff members in Tamil Nadu
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            Complete corporate workforce roster, statutory records, and identity management.
           </p>
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-2.5">
+        <div className="flex items-center gap-2.5">
           <Button
             variant="outline"
             size="sm"
             onClick={handleExportCSV}
             leftIcon={<Download className="w-4 h-4" />}
-            className="flex-1 sm:flex-none text-xs"
           >
             Export CSV
           </Button>
@@ -164,23 +188,73 @@ export function EmployeeList({
             size="sm"
             onClick={() => router.push("/employees/new")}
             leftIcon={<Plus className="w-4 h-4" />}
-            className="flex-1 sm:flex-none text-xs"
           >
-            Add Employee
+            Onboard Employee
           </Button>
         </div>
       </div>
 
+      {/* KPI Overview Summary Banner */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="p-4 border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Total Headcount
+            </span>
+            <Users className="w-4 h-4 text-sky-500" />
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
+            {employees.length} <span className="text-xs font-normal text-slate-400">Staff</span>
+          </p>
+        </Card>
+
+        <Card className="p-4 border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">
+              Active On Payroll
+            </span>
+            <Building2 className="w-4 h-4 text-emerald-500" />
+          </div>
+          <p className="text-2xl font-extrabold text-emerald-600 dark:text-emerald-400 mt-2">
+            {activeCount} <span className="text-xs font-normal text-slate-400">Active</span>
+          </p>
+        </Card>
+
+        <Card className="p-4 border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+              Departments
+            </span>
+            <Briefcase className="w-4 h-4 text-indigo-500" />
+          </div>
+          <p className="text-2xl font-extrabold text-slate-900 dark:text-slate-100 mt-2">
+            {departments.length} <span className="text-xs font-normal text-slate-400">Divisions</span>
+          </p>
+        </Card>
+
+        <Card className="p-4 border-slate-200/80 dark:border-slate-800 bg-white/80 dark:bg-slate-900/80 backdrop-blur-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-semibold text-amber-600 dark:text-amber-400 uppercase tracking-wider">
+              Monthly Commitment
+            </span>
+            <TrendingUp className="w-4 h-4 text-amber-500" />
+          </div>
+          <p className="text-xl sm:text-2xl font-extrabold font-mono text-slate-900 dark:text-slate-100 mt-2 truncate">
+            {formatINR(totalMonthlyGross)}
+          </p>
+        </Card>
+      </div>
+
       {/* Filter and Search Bar */}
       <Card>
-        <CardContent className="p-3 sm:p-4">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <CardContent className="p-3.5 sm:p-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             {/* Search Input */}
             <Input
-              placeholder="Search name, ID, designation..."
+              placeholder="Search name, ID, designation, email..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              leftIcon={<Search className="w-4 h-4" />}
+              leftIcon={<Search className="w-4 h-4 text-slate-400" />}
               className="text-xs"
             />
 
@@ -219,8 +293,8 @@ export function EmployeeList({
               className="text-xs"
             >
               <option value="name">Sort by Name (A-Z)</option>
-              <option value="date">Sort by Joining Date</option>
-              <option value="salary">Sort by Salary (High-Low)</option>
+              <option value="date">Sort by Joining Date (Newest)</option>
+              <option value="salary">Sort by Salary (Highest First)</option>
             </Select>
           </div>
         </CardContent>
@@ -230,9 +304,9 @@ export function EmployeeList({
       <div className="block md:hidden space-y-3">
         {filteredEmployees.length === 0 ? (
           <Card>
-            <CardContent className="p-6">
+            <CardContent className="p-8">
               <TableEmptyState
-                icon={<Users className="w-8 h-8" />}
+                icon={<Users className="w-8 h-8 text-slate-400" />}
                 title="No employees found"
                 description="No employee records match your current filter criteria."
                 action={
@@ -252,94 +326,88 @@ export function EmployeeList({
             </CardContent>
           </Card>
         ) : (
-          filteredEmployees.map((emp) => (
-            <div
-              key={emp.id}
-              className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3 transition-all active:scale-[0.99]"
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-11 h-11 rounded-2xl overflow-hidden bg-sky-100 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                    {emp.avatarUrl ? (
-                      <img src={emp.avatarUrl} alt={emp.firstName} className="w-full h-full object-cover" />
-                    ) : (
-                      getInitials(`${emp.firstName} ${emp.lastName}`)
-                    )}
+          filteredEmployees.map((emp) => {
+            const fullName = `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || emp.id;
+            const deptName = emp.departmentName || deptMap.get(emp.departmentId || "") || "General";
+            const desigTitle = emp.designationTitle || desigMap.get(emp.designationId || "") || "Staff";
+            const statusConfig = statusBadges[emp.status] || { variant: "secondary", label: emp.status || "Active" };
+
+            return (
+              <div
+                key={emp.id}
+                className="p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 shadow-sm space-y-3"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-11 h-11 rounded-2xl overflow-hidden bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
+                      {emp.avatarUrl ? (
+                        <img src={emp.avatarUrl} alt={fullName} className="w-full h-full object-cover" />
+                      ) : (
+                        getInitials(fullName)
+                      )}
+                    </div>
+                    <div className="min-w-0">
+                      <Link
+                        href={`/employees/${emp.id}`}
+                        className="font-bold text-sm text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors truncate block"
+                      >
+                        {fullName}
+                      </Link>
+                      <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                        {desigTitle}
+                      </p>
+                    </div>
                   </div>
-                  <div className="min-w-0">
-                    <Link
-                      href={`/employees/${emp.id}`}
-                      className="font-bold text-sm text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors truncate block"
+
+                  <Badge variant={statusConfig.variant} size="sm" dot>
+                    {statusConfig.label}
+                  </Badge>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2 text-xs py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">Department</span>
+                    <span className="font-semibold text-slate-700 dark:text-slate-300 truncate block">
+                      {deptName}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-[10px] text-slate-400 block uppercase font-medium">Monthly Gross</span>
+                    <span className="font-bold font-mono text-slate-900 dark:text-slate-100">
+                      {formatINR(emp.currentMonthlyGross || 0)}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1 gap-2 border-t border-slate-100 dark:border-slate-800">
+                  <span className="text-[11px] font-mono font-medium px-2 py-0.5 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    {emp.id}
+                  </span>
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setDeletingEmployee(emp)}
+                      className="h-8 px-2.5 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-800"
+                      title="Remove Employee from Server"
                     >
-                      {emp.firstName} {emp.lastName}
-                    </Link>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                      {emp.designationTitle}
-                    </p>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      variant="coral"
+                      size="sm"
+                      onClick={() => router.push(`/employees/${emp.id}`)}
+                      className="h-8 px-3 text-xs"
+                    >
+                      <Eye className="w-3.5 h-3.5 mr-1" />
+                      View Profile
+                    </Button>
                   </div>
                 </div>
-
-                <Badge
-                  variant={statusBadges[emp.status]?.variant || "secondary"}
-                  size="sm"
-                  dot
-                >
-                  {statusBadges[emp.status]?.label || emp.status}
-                </Badge>
               </div>
-
-              <div className="grid grid-cols-2 gap-2 text-xs py-2 px-3 rounded-xl bg-slate-50 dark:bg-slate-800/60 border border-slate-100 dark:border-slate-800">
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Department</span>
-                  <span className="font-medium text-slate-700 dark:text-slate-300 truncate block">
-                    {emp.departmentName}
-                  </span>
-                </div>
-                <div>
-                  <span className="text-[10px] text-slate-400 block">Monthly Gross</span>
-                  <span className="font-bold font-mono text-slate-900 dark:text-slate-100">
-                    {formatINR(emp.currentMonthlyGross)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between pt-1 gap-2 border-t border-slate-100 dark:border-slate-800">
-                <span className="text-[11px] font-mono text-slate-400">
-                  {emp.id}
-                </span>
-
-                <div className="flex items-center gap-1.5">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setDeletingEmployee(emp)}
-                    className="h-8 px-2 text-xs text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-800"
-                    title="Remove Employee from Server"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => router.push(`/employees/${emp.id}?edit=true`)}
-                    className="h-8 px-2.5 text-xs"
-                  >
-                    <Edit className="w-3.5 h-3.5 mr-1" />
-                    Edit
-                  </Button>
-                  <Button
-                    variant="coral"
-                    size="sm"
-                    onClick={() => router.push(`/employees/${emp.id}`)}
-                    className="h-8 px-2.5 text-xs"
-                  >
-                    View
-                    <ChevronRight className="w-3.5 h-3.5 ml-1" />
-                  </Button>
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -348,7 +416,7 @@ export function EmployeeList({
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Employee</TableHead>
+              <TableHead>Employee Profile</TableHead>
               <TableHead>Employee ID</TableHead>
               <TableHead>Department</TableHead>
               <TableHead>Designation</TableHead>
@@ -363,7 +431,7 @@ export function EmployeeList({
               <tr>
                 <td colSpan={8}>
                   <TableEmptyState
-                    icon={<Users className="w-8 h-8" />}
+                    icon={<Users className="w-8 h-8 text-slate-400" />}
                     title="No employees found"
                     description="No employee records match your current filter criteria."
                     action={
@@ -383,108 +451,102 @@ export function EmployeeList({
                 </td>
               </tr>
             ) : (
-              filteredEmployees.map((emp) => (
-                <TableRow key={emp.id}>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-full overflow-hidden bg-sky-100 dark:bg-sky-950 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 font-bold text-xs flex items-center justify-center shrink-0 shadow-sm">
-                        {emp.avatarUrl ? (
-                          <img src={emp.avatarUrl} alt={emp.firstName} className="w-full h-full object-cover" />
-                        ) : (
-                          getInitials(`${emp.firstName} ${emp.lastName}`)
-                        )}
+              filteredEmployees.map((emp) => {
+                const fullName = `${emp.firstName || ""} ${emp.lastName || ""}`.trim() || emp.id;
+                const deptName = emp.departmentName || deptMap.get(emp.departmentId || "") || "General";
+                const desigTitle = emp.designationTitle || desigMap.get(emp.designationId || "") || "Staff";
+                const statusConfig = statusBadges[emp.status] || { variant: "secondary", label: emp.status || "Active" };
+
+                return (
+                  <TableRow key={emp.id} className="hover:bg-slate-50/70 dark:hover:bg-slate-850/50 transition-colors">
+                    <TableCell>
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-tr from-sky-500 to-blue-600 text-white font-bold text-xs flex items-center justify-center shrink-0 shadow-sm border border-slate-200 dark:border-slate-700">
+                          {emp.avatarUrl ? (
+                            <img src={emp.avatarUrl} alt={fullName} className="w-full h-full object-cover" />
+                          ) : (
+                            getInitials(fullName)
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <Link
+                            href={`/employees/${emp.id}`}
+                            className="font-bold text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors truncate block"
+                          >
+                            {fullName}
+                          </Link>
+                          <p className="text-xs text-slate-400 truncate">{emp.email || "No email registered"}</p>
+                        </div>
                       </div>
-                      <div>
-                        <Link
-                          href={`/employees/${emp.id}`}
-                          className="font-bold text-slate-900 dark:text-slate-100 hover:text-coral-500 transition-colors"
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="font-mono text-xs font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        {emp.id}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                        {deptName}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="text-xs text-slate-600 dark:text-slate-400">
+                        {desigTitle}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <Badge variant={statusConfig.variant} size="sm" dot>
+                        {statusConfig.label}
+                      </Badge>
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="font-mono font-bold text-slate-900 dark:text-slate-100">
+                        {formatINR(emp.currentMonthlyGross || 0)}
+                      </span>
+                    </TableCell>
+
+                    <TableCell>
+                      <span className="text-xs text-slate-500 dark:text-slate-400">
+                        {formatDate(emp.joiningDate || new Date().toISOString())}
+                      </span>
+                    </TableCell>
+
+                    <TableCell className="text-right">
+                      <div className="flex items-center justify-end gap-2">
+                        <Button
+                          variant="coral"
+                          size="sm"
+                          onClick={() => router.push(`/employees/${emp.id}`)}
+                          className="h-8 px-3 text-xs"
                         >
-                          {emp.firstName} {emp.lastName}
-                        </Link>
-                        <p className="text-xs text-slate-400">{emp.email}</p>
+                          <Eye className="w-3.5 h-3.5 mr-1" />
+                          View Profile
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setDeletingEmployee(emp)}
+                          title="Permanently remove employee from database server"
+                          className="h-8 px-2 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30 border-rose-200 dark:border-rose-800"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </Button>
                       </div>
-                    </div>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="font-mono text-xs font-semibold px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300">
-                      {emp.id}
-                    </span>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                      {emp.departmentName}
-                    </span>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="text-xs text-slate-600 dark:text-slate-400">
-                      {emp.designationTitle}
-                    </span>
-                  </TableCell>
-
-                  <TableCell>
-                    <Badge
-                      variant={statusBadges[emp.status]?.variant || "secondary"}
-                      size="sm"
-                      dot
-                    >
-                      {statusBadges[emp.status]?.label || emp.status}
-                    </Badge>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="font-mono font-semibold text-slate-900 dark:text-slate-100">
-                      {formatINR(emp.currentMonthlyGross)}
-                    </span>
-                  </TableCell>
-
-                  <TableCell>
-                    <span className="text-xs text-slate-500">
-                      {formatDate(emp.joiningDate)}
-                    </span>
-                  </TableCell>
-
-                  <TableCell className="text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/employees/${emp.id}`)}
-                        title="View Profile"
-                        className="h-8 px-2"
-                      >
-                        <Eye className="w-4 h-4 text-slate-500 hover:text-slate-900" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => router.push(`/employees/${emp.id}?edit=true`)}
-                        title="Edit Employee"
-                        className="h-8 px-2"
-                      >
-                        <Edit className="w-4 h-4 text-slate-500 hover:text-slate-900" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDeletingEmployee(emp)}
-                        title="Delete Employee from Server"
-                        className="h-8 px-2 text-rose-500 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950/30"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))
+                    </TableCell>
+                  </TableRow>
+                );
+              })
             )}
           </TableBody>
         </Table>
       </div>
 
-      {/* Delete Confirmation Modal */}
+      {/* Permanent Delete Confirmation Modal */}
       <Modal
         isOpen={!!deletingEmployee}
         onClose={() => setDeletingEmployee(null)}
@@ -497,7 +559,7 @@ export function EmployeeList({
             <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <p className="font-semibold text-sm mb-1">Permanent Data & Record Cascading Removal</p>
+                <p className="font-semibold text-sm mb-1">Permanent Data & Cascading Record Removal</p>
                 <p>
                   You are about to permanently remove <strong>{deletingEmployee.firstName} {deletingEmployee.lastName}</strong> ({deletingEmployee.id}).
                   Their profile, login credentials, attendance records, leave applications, generated payslips, and payroll records will be automatically erased from Google Cloud Firestore.
@@ -508,7 +570,7 @@ export function EmployeeList({
             <div className="p-3 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs space-y-1">
               <p><span className="text-slate-400">Employee ID:</span> <span className="font-mono font-bold">{deletingEmployee.id}</span></p>
               <p><span className="text-slate-400">Official Email:</span> <span className="font-medium">{deletingEmployee.email}</span></p>
-              <p><span className="text-slate-400">Designation:</span> <span className="font-medium">{deletingEmployee.designationTitle}</span></p>
+              <p><span className="text-slate-400">Designation:</span> <span className="font-medium">{deletingEmployee.designationTitle || deptMap.get(deletingEmployee.departmentId || "") || "Staff"}</span></p>
             </div>
 
             <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
