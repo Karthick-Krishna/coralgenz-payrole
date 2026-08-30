@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
-import { LeaveService } from '@/lib/firebase/leave-service';
+import { adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
 import { doc, deleteDoc } from 'firebase/firestore';
+import { FirestoreRest } from '@/lib/firebase/firestore-rest';
+import { LeaveService } from '@/lib/firebase/leave-service';
 
 export async function GET(request: Request) {
   try {
@@ -32,11 +34,35 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ success: false, error: 'Leave Request ID is required' }, { status: 400 });
     }
 
-    if (db) {
+    let deleted = false;
+
+    // 1. Admin SDK deletion
+    if (adminDb && typeof adminDb.collection === 'function') {
+      try {
+        await adminDb.collection('leaveRequests').doc(id).delete();
+        deleted = true;
+      } catch (adminErr: any) {
+        console.warn('Admin Firestore deleteLeave error:', adminErr.message);
+      }
+    }
+
+    // 2. Google Cloud Firestore REST API deletion
+    if (!deleted) {
+      try {
+        const restDeleted = await FirestoreRest.deleteDocument('leaveRequests', id);
+        if (restDeleted) deleted = true;
+      } catch (restErr: any) {
+        console.warn('REST deleteLeave warning:', restErr.message);
+      }
+    }
+
+    // 3. Client Firestore Fallback
+    if (!deleted && db) {
       try {
         await deleteDoc(doc(db, 'leaveRequests', id));
-      } catch (err: any) {
-        console.error('API Leave deleteDoc error:', err.message);
+        deleted = true;
+      } catch (clientErr: any) {
+        console.error('Client Firestore deleteLeave error:', clientErr.message);
       }
     }
 

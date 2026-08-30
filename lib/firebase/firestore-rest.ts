@@ -9,7 +9,7 @@ export class FirestoreRest {
   private static projectId = firebaseConfig.projectId || 'coralgenz-payroll';
   private static baseUrl = `https://firestore.googleapis.com/v1/projects/${this.projectId}/databases/(default)/documents`;
 
-  private static toFirestoreFields(obj: any): any {
+  public static toFirestoreFields(obj: any): any {
     const fields: any = {};
     for (const [key, val] of Object.entries(obj)) {
       if (val === undefined || val === null) {
@@ -33,7 +33,7 @@ export class FirestoreRest {
     return fields;
   }
 
-  private static fromFirestoreFields(fields: any): any {
+  public static fromFirestoreFields(fields: any): any {
     if (!fields) return {};
     const obj: any = {};
     for (const [key, valObj] of Object.entries(fields) as [string, any][]) {
@@ -52,25 +52,25 @@ export class FirestoreRest {
     return obj;
   }
 
-  public static async getEmployees(authHeader?: string): Promise<Employee[]> {
+  public static async deleteDocument(collectionName: string, id: string, authHeader?: string): Promise<boolean> {
     try {
-      const url = `${this.baseUrl}/employees?pageSize=100`;
+      const url = `${this.baseUrl}/${collectionName}/${encodeURIComponent(id)}`;
       const headers: Record<string, string> = {};
       if (authHeader) headers['Authorization'] = authHeader;
-      const res = await fetch(url, { headers, cache: 'no-store' });
-      if (!res.ok) return [];
-      const data = await res.json();
-      if (!data.documents) return [];
-      return data.documents.map((docItem: any) => this.fromFirestoreFields(docItem.fields) as Employee);
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers,
+      });
+      return res.ok || res.status === 404;
     } catch {
-      return [];
+      return false;
     }
   }
 
-  public static async setEmployee(id: string, employee: Employee, authHeader?: string): Promise<boolean> {
+  public static async setDocument(collectionName: string, id: string, data: any, authHeader?: string): Promise<boolean> {
     try {
-      const url = `${this.baseUrl}/employees/${id}`;
-      const fields = this.toFirestoreFields(employee);
+      const url = `${this.baseUrl}/${collectionName}/${encodeURIComponent(id)}`;
+      const fields = this.toFirestoreFields(data);
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (authHeader) headers['Authorization'] = authHeader;
       const res = await fetch(url, {
@@ -84,15 +84,42 @@ export class FirestoreRest {
     }
   }
 
+  public static async getDocuments(collectionName: string, authHeader?: string): Promise<any[]> {
+    try {
+      const url = `${this.baseUrl}/${collectionName}?pageSize=300`;
+      const headers: Record<string, string> = {};
+      if (authHeader) headers['Authorization'] = authHeader;
+      const res = await fetch(url, { headers, cache: 'no-store' });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!data.documents) return [];
+      return data.documents.map((docItem: any) => {
+        const id = docItem.name ? docItem.name.split('/').pop() : '';
+        return { ...this.fromFirestoreFields(docItem.fields), id };
+      });
+    } catch {
+      return [];
+    }
+  }
+
+  public static async getEmployees(authHeader?: string): Promise<Employee[]> {
+    return this.getDocuments('employees', authHeader);
+  }
+
+  public static async setEmployee(id: string, employee: Employee, authHeader?: string): Promise<boolean> {
+    return this.setDocument('employees', id, employee, authHeader);
+  }
+
   public static async getEmployee(id: string, authHeader?: string): Promise<Employee | null> {
     try {
-      const url = `${this.baseUrl}/employees/${id}`;
+      const url = `${this.baseUrl}/employees/${encodeURIComponent(id)}`;
       const headers: Record<string, string> = {};
       if (authHeader) headers['Authorization'] = authHeader;
       const res = await fetch(url, { headers, cache: 'no-store' });
       if (!res.ok) return null;
       const data = await res.json();
-      return this.fromFirestoreFields(data.fields) as Employee;
+      const objId = data.name ? data.name.split('/').pop() : id;
+      return { ...this.fromFirestoreFields(data.fields), id: objId } as Employee;
     } catch {
       return null;
     }
