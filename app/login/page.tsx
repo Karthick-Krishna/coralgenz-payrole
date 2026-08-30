@@ -14,6 +14,7 @@ import {
   Eye,
   EyeOff,
   AlertCircle,
+  Sparkles,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -91,18 +92,44 @@ export default function LoginPage() {
         </div>
       </header>
 
-      {/* Main Content Area - Center Sign In Card */}
-      <main className="relative z-10 w-full max-w-md mx-auto px-4 sm:px-6 py-8 my-auto">
+      {/* Main Content Area - Attractive Animated Brand Heading & Login Card */}
+      <main className="relative z-10 w-full max-w-md mx-auto px-4 sm:px-6 py-6 my-auto">
+        
+        {/* Animated Brand Heading Design */}
+        <div className="text-center space-y-2.5 mb-6">
+          {/* Animated Glowing Logo Badge with Fire & Aurora Halo */}
+          <div className="relative inline-flex items-center justify-center mb-1">
+            <div className="absolute -inset-2 rounded-3xl bg-gradient-to-r from-orange-500 via-coral-500 to-indigo-600 blur-lg opacity-70 animate-fire-glow-pulse pointer-events-none" />
+            <div className="relative w-16 h-16 rounded-2xl bg-white/95 p-2.5 shadow-2xl border border-amber-200/80 flex items-center justify-center backdrop-blur-sm group hover:scale-105 transition-transform">
+              <img src="/logo.png" alt="Coralgenz Payroll" className="w-full h-full object-contain drop-shadow" />
+            </div>
+          </div>
+
+          {/* Grand Animated Gradient Heading */}
+          <div className="space-y-1">
+            <h1 className="text-3xl sm:text-[34px] font-black tracking-tight flex items-center justify-center gap-2.5 flex-wrap">
+              <span className="bg-gradient-to-r from-slate-950 via-slate-800 to-sky-950 bg-clip-text text-transparent drop-shadow-xs">
+                Coralgenz
+              </span>
+              <span className="bg-gradient-to-r from-coral-500 via-amber-500 to-rose-600 bg-clip-text text-transparent animate-gradient-flow font-extrabold drop-shadow-[0_2px_10px_rgba(255,107,74,0.3)]">
+                Payroll
+              </span>
+            </h1>
+            <p className="text-xs sm:text-sm font-medium text-slate-500 flex items-center justify-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+              <span>Enterprise Workforce & Compensation Platform</span>
+            </p>
+          </div>
+        </div>
+
+        {/* Central Authentication Card */}
         <div className="bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-[0_25px_60px_-15px_rgba(2,132,199,0.14)] rounded-3xl p-6 sm:p-9 space-y-6 transition-all">
           
           {/* Card Header */}
-          <div className="text-center space-y-2">
-            <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 p-2.5 flex items-center justify-center shadow-md shadow-sky-500/20 mx-auto mb-3">
-              <Lock className="w-6 h-6 text-white" />
-            </div>
-            <h1 className="text-2xl sm:text-[26px] font-extrabold text-slate-900 tracking-tight">
+          <div className="text-center space-y-1.5">
+            <h2 className="text-xl sm:text-2xl font-extrabold text-slate-900 tracking-tight">
               Sign in to your account
-            </h1>
+            </h2>
             <p className="text-xs sm:text-sm text-slate-500 font-normal max-w-xs mx-auto">
               Enter your registered corporate credentials to access the portal.
             </p>
