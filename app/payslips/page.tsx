@@ -6,6 +6,7 @@ import { PayslipList } from "@/components/payslips/payslip-list";
 import { useAuth } from "@/lib/auth/auth-context";
 import { PayrollService } from "@/lib/firebase/payroll-service";
 import { Payslip } from "@/types";
+import { PageLogoLoader } from "@/components/ui/logo-loader";
 
 export default function PayslipsPage() {
   const { currentRole, user } = useAuth();
@@ -36,9 +37,7 @@ export default function PayslipsPage() {
   return (
     <AppLayout module="payslips">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Employee Payslips & Tax Breakdown Statements..." />
       ) : (
         <PayslipList
           payslips={payslips}

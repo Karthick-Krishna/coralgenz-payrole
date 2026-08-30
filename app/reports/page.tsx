@@ -16,6 +16,8 @@ import {
   Department,
 } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function ReportsPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [payrollRuns, setPayrollRuns] = useState<PayrollRun[]>([]);
@@ -56,9 +58,7 @@ export default function ReportsPage() {
   return (
     <AppLayout module="reports">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Compiling Statutory Analytics & Financial Audit Reports..." />
       ) : (
         <ReportViewer
           employees={employees}

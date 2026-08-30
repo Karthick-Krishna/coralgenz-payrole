@@ -9,7 +9,8 @@ import { DesignationService } from "@/lib/firebase/designation-service";
 import { Employee, Department, Designation } from "@/types";
 import { useToast } from "@/components/ui/toast";
 import { useAuth } from "@/lib/auth/auth-context";
-import { FireLogoLoader } from "@/components/ui/fire-logo-loader";
+
+import { PageLogoLoader } from "@/components/ui/logo-loader";
 
 export default function EmployeesPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -59,13 +60,7 @@ export default function EmployeesPage() {
   return (
     <AppLayout module="employees">
       {isLoading ? (
-        <div className="flex min-h-[50vh] items-center justify-center">
-          <FireLogoLoader
-            size="md"
-            message="Loading Workforce Directory..."
-            subMessage="Retrieving employee profiles & statutory details from database"
-          />
-        </div>
+        <PageLogoLoader text="Fetching Employee Records from Database..." />
       ) : (
         <EmployeeList
           employees={employees}

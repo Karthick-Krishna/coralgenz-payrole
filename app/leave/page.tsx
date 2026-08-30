@@ -9,6 +9,8 @@ import { LeaveRequest, LeaveBalance, Employee } from "@/types";
 
 import { useAuth } from "@/lib/auth/auth-context";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function LeavePage() {
   const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
   const [leaveBalances, setLeaveBalances] = useState<LeaveBalance[]>([]);
@@ -54,9 +56,7 @@ export default function LeavePage() {
   return (
     <AppLayout module="leave">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Leave Balances & Approval Workflows..." />
       ) : (
         <LeaveManager
           initialLeaveRequests={leaveRequests}

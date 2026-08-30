@@ -6,6 +6,8 @@ import { DepartmentManager } from "@/components/departments/department-manager";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Department, Employee } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function DepartmentsPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -39,9 +41,7 @@ export default function DepartmentsPage() {
   return (
     <AppLayout module="departments">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Corporate Departments & Budget Allocations..." />
       ) : (
         <DepartmentManager
           initialDepartments={departments}

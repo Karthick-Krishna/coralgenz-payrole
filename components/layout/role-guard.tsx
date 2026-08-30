@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/auth-context";
 import { UserRole } from "@/types";
 import { hasPermission, Permission, canAccessModule } from "@/lib/permissions/rbac";
-import { FireLogoLoader } from "@/components/ui/fire-logo-loader";
+import { PageLogoLoader } from "@/components/ui/logo-loader";
 import { ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -59,12 +59,8 @@ export function RoleGuard({
 
   if (isLoading || (!user && !isLoading)) {
     return (
-      <div className="flex items-center justify-center min-h-[55vh] p-8">
-        <FireLogoLoader
-          size="md"
-          message="Igniting Payroll System..."
-          subMessage="Verifying role permissions with database server"
-        />
+      <div className="p-8 flex items-center justify-center min-h-[400px]">
+        <PageLogoLoader text="Verifying Role Permissions & Authenticating Server..." />
       </div>
     );
   }

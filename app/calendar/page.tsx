@@ -5,6 +5,8 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { CalendarView } from "@/components/shared/calendar-view";
 import { Holiday } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function CalendarPage() {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -34,9 +36,7 @@ export default function CalendarPage() {
   return (
     <AppLayout module="calendar">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Corporate Holiday Calendar & Event Schedule..." />
       ) : (
         <CalendarView initialHolidays={holidays} onRefresh={() => loadData(false)} />
       )}

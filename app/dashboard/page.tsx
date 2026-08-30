@@ -29,6 +29,8 @@ import {
   Payslip,
 } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function DashboardPage() {
   const { currentRole, user } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -119,9 +121,7 @@ export default function DashboardPage() {
   return (
     <AppLayout module="dashboard">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Coralgenz Unified Dashboard..." />
       ) : (
         <>
           {currentRole === "super_admin" && (

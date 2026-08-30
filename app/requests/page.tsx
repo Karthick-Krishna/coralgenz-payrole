@@ -7,6 +7,8 @@ import { RequestService } from "@/lib/firebase/request-service";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { EmployeeRequest, Employee } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function RequestsPage() {
   const [requests, setRequests] = useState<EmployeeRequest[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -38,9 +40,7 @@ export default function RequestsPage() {
   return (
     <AppLayout module="requests">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Employee Claims & Requests..." />
       ) : (
         <RequestManager
           initialRequests={requests}

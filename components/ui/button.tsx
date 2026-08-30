@@ -68,7 +68,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(baseStyles, variantStyles[variant], sizeStyles[size], className)}
         {...props}
       >
-        {isLoading && <Loader2 className="w-4 h-4 animate-spin text-current" />}
+        {isLoading && (
+          <span className="w-4 h-4 rounded-full border border-amber-300 border-t-orange-500 border-r-red-500 animate-fire-ring-spin shrink-0 flex items-center justify-center bg-white/20 p-0.5 shadow-sm">
+            <img src="/logo.png" className="w-2.5 h-2.5 animate-fire-roll" alt="" />
+          </span>
+        )}
         {!isLoading && leftIcon && <span className="shrink-0">{leftIcon}</span>}
         {children}
         {!isLoading && rightIcon && <span className="shrink-0">{rightIcon}</span>}

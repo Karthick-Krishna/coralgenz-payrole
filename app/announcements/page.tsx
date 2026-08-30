@@ -6,6 +6,8 @@ import { AnnouncementManager } from "@/components/shared/announcement-manager";
 import { AnnouncementService } from "@/lib/firebase/announcement-service";
 import { Announcement } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function AnnouncementsPage() {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,9 +34,7 @@ export default function AnnouncementsPage() {
   return (
     <AppLayout module="announcements">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Corporate Announcements & Executive Broadcasts..." />
       ) : (
         <AnnouncementManager initialAnnouncements={announcements} onRefresh={loadData} />
       )}

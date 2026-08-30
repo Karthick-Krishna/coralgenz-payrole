@@ -6,6 +6,8 @@ import { AuditLogViewer } from "@/components/shared/audit-log-viewer";
 import { AuditService } from "@/lib/firebase/audit-service";
 import { AuditLog } from "@/types";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function AuditLogsPage() {
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,9 +34,7 @@ export default function AuditLogsPage() {
   return (
     <AppLayout module="audit_logs">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Retrieving Immutable Security Audit Logs from Database..." />
       ) : (
         <AuditLogViewer initialLogs={logs} />
       )}

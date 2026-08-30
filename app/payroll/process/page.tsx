@@ -5,22 +5,18 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { PayrollProcessWizard } from "@/components/payroll/payroll-process-wizard";
 import { EmployeeService } from "@/lib/firebase/employee-service";
 import { Employee } from "@/types";
+import { PageLogoLoader } from "@/components/ui/logo-loader";
 
-export default function ProcessPayrollPage() {
+export default function PayrollProcessPage() {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadEmployees = async () => {
       setIsLoading(true);
-      try {
-        const emps = await EmployeeService.getEmployees();
-        setEmployees(emps);
-      } catch (e) {
-        console.error("Error loading employees for payroll:", e);
-      } finally {
-        setIsLoading(false);
-      }
+      const data = await EmployeeService.getEmployees();
+      setEmployees(data);
+      setIsLoading(false);
     };
     loadEmployees();
   }, []);
@@ -28,9 +24,7 @@ export default function ProcessPayrollPage() {
   return (
     <AppLayout module="payroll">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Initializing Payroll Calculation Engine & Pre-checking PF/ESI Compliance..." />
       ) : (
         <PayrollProcessWizard employees={employees} />
       )}

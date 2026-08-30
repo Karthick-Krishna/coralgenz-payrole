@@ -9,6 +9,7 @@ import { SettingsService } from "@/lib/firebase/settings-service";
 import { DEMO_ORGANIZATION } from "@/lib/demo/demo-data";
 import { Payslip, Organization } from "@/types";
 import { Button } from "@/components/ui/button";
+import { PageLogoLoader } from "@/components/ui/logo-loader";
 
 export default function PayslipDetailPage() {
   const params = useParams();
@@ -46,9 +47,7 @@ export default function PayslipDetailPage() {
   if (isLoading) {
     return (
       <AppLayout module="payslips">
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Generating Payslip Document Preview..." />
       </AppLayout>
     );
   }

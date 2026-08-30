@@ -10,6 +10,8 @@ import { AttendanceRecord, Employee, Department } from "@/types";
 
 import { useAuth } from "@/lib/auth/auth-context";
 
+import { PageLogoLoader } from "@/components/ui/logo-loader";
+
 export default function AttendancePage() {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -55,9 +57,7 @@ export default function AttendancePage() {
   return (
     <AppLayout module="attendance">
       {isLoading ? (
-        <div className="flex h-64 items-center justify-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-coral-500"></div>
-        </div>
+        <PageLogoLoader text="Loading Employee Attendance Logs & Biometric Sync..." />
       ) : (
         <AttendanceTracker
           initialAttendance={attendance}

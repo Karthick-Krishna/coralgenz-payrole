@@ -10,7 +10,9 @@ import { DepartmentService } from "@/lib/firebase/department-service";
 import { DesignationService } from "@/lib/firebase/designation-service";
 import { Employee, Department, Designation } from "@/types";
 import { Button } from "@/components/ui/button";
-import { FireLogoLoader } from "@/components/ui/fire-logo-loader";
+import { DashboardSkeleton } from "@/components/ui/skeleton";
+
+import { PageLogoLoader } from "@/components/ui/logo-loader";
 
 function EmployeeDetailContent() {
   const params = useParams();
@@ -50,15 +52,7 @@ function EmployeeDetailContent() {
   }, [id, isEditingParam]);
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-[50vh] items-center justify-center p-8">
-        <FireLogoLoader
-          size="md"
-          message="Igniting Employee Profile..."
-          subMessage="Loading salary structure, compliance, and employment records"
-        />
-      </div>
-    );
+    return <PageLogoLoader text="Loading Employee Profile & Salary History..." />;
   }
 
   if (!employee) {
@@ -111,17 +105,7 @@ function EmployeeDetailContent() {
 export default function EmployeeDetailPage() {
   return (
     <AppLayout module="employees">
-      <Suspense
-        fallback={
-          <div className="flex min-h-[50vh] items-center justify-center p-8">
-            <FireLogoLoader
-              size="md"
-              message="Igniting Employee Records..."
-              subMessage="Loading verified salary and compliance files"
-            />
-          </div>
-        }
-      >
+      <Suspense fallback={<DashboardSkeleton />}>
         <EmployeeDetailContent />
       </Suspense>
     </AppLayout>
