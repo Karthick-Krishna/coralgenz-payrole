@@ -31,6 +31,8 @@ import {
   X,
   FileText,
   Calendar,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 interface LeaveManagerProps {
@@ -46,11 +48,16 @@ export function LeaveManager({
   employees,
   onRefresh,
 }: LeaveManagerProps) {
-  const { user, currentRole } = useAuth();
+  const { user, currentRole, isSuperAdmin } = useAuth();
   const { success, error } = useToast();
   const [requests, setRequests] = useState<LeaveRequest[]>(initialLeaveRequests);
   const [balances, setBalances] = useState<LeaveBalance[]>(initialBalances);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+
+  // Deletion modal state
+  const [deletingLeave, setDeletingLeave] = useState<LeaveRequest | null>(null);
+  const [isDeletingLeave, setIsDeletingLeave] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
 
   // Apply Leave Modal State
   const [showApplyModal, setShowApplyModal] = useState(false);
@@ -162,6 +169,35 @@ export function LeaveManager({
     refreshData();
   };
 
+  const handleConfirmDeleteLeave = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingLeave) return;
+    setIsDeletingLeave(true);
+    try {
+      const res = await LeaveService.deleteLeaveRequest(
+        deletingLeave.id,
+        {
+          id: user?.id || "usr-admin",
+          name: user?.displayName || "Admin",
+          role: currentRole,
+        },
+        deleteReason.trim() || `Deleted leave application ${deletingLeave.id}`
+      );
+      if (res) {
+        success("Leave Application Deleted", "Permanently removed leave record from the server.");
+        setDeletingLeave(null);
+        refreshData();
+        onRefresh?.();
+      } else {
+        error("Delete Failed", "Could not remove leave application from the server.");
+      }
+    } catch (err: any) {
+      error("Error", err.message || "Failed to delete leave application.");
+    } finally {
+      setIsDeletingLeave(false);
+    }
+  };
+
   const filteredRequests = requests.filter((r) => {
     if (isEmployee) {
       if (r.employeeId !== myEmpId && r.employeeName !== user?.displayName) return false;
@@ -180,6 +216,10 @@ export function LeaveManager({
     approved: { variant: "success", label: "Approved" },
     rejected: { variant: "danger", label: "Rejected" },
     cancelled: { variant: "secondary", label: "Cancelled" },
+  };
+
+  const canDeleteLeave = (req: LeaveRequest) => {
+    return isSuperAdmin || canApprove || (req.employeeId === myEmpId && req.status === "pending");
   };
 
   return (
@@ -326,28 +366,45 @@ export function LeaveManager({
                 )}
               </div>
 
-              {canApprove && req.status === "pending" && (
-                <div className="flex items-center justify-end gap-2 pt-1">
+              <div className="flex items-center justify-end gap-2 pt-1">
+                {canApprove && req.status === "pending" && (
+                  <>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleReject(req.id)}
+                      className="h-8 text-xs text-rose-600 hover:bg-rose-50 flex-1"
+                    >
+                      <X className="w-3.5 h-3.5 mr-1" />
+                      Reject
+                    </Button>
+                    <Button
+                      variant="success"
+                      size="sm"
+                      onClick={() => handleApprove(req.id)}
+                      className="h-8 text-xs flex-1"
+                    >
+                      <Check className="w-3.5 h-3.5 mr-1" />
+                      Approve
+                    </Button>
+                  </>
+                )}
+                {canDeleteLeave(req) && (
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => handleReject(req.id)}
-                    className="h-8 text-xs text-rose-600 hover:bg-rose-50 flex-1"
+                    onClick={() => {
+                      setDeleteReason("");
+                      setDeletingLeave(req);
+                    }}
+                    className="h-8 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-800"
+                    title="Delete Leave Application"
                   >
-                    <X className="w-3.5 h-3.5 mr-1" />
-                    Reject
+                    <Trash2 className="w-3.5 h-3.5 mr-1" />
+                    Delete
                   </Button>
-                  <Button
-                    variant="success"
-                    size="sm"
-                    onClick={() => handleApprove(req.id)}
-                    className="h-8 text-xs flex-1"
-                  >
-                    <Check className="w-3.5 h-3.5 mr-1" />
-                    Approve
-                  </Button>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           ))
         )}
@@ -421,30 +478,47 @@ export function LeaveManager({
                   </TableCell>
 
                   <TableCell className="text-right">
-                    {canApprove && req.status === "pending" ? (
-                      <div className="flex items-center justify-end gap-1.5">
+                    <div className="flex items-center justify-end gap-1.5">
+                      {canApprove && req.status === "pending" && (
+                        <>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleApprove(req.id)}
+                            className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
+                            title="Approve Request"
+                          >
+                            <Check className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReject(req.id)}
+                            className="h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                            title="Reject Request"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                      {canDeleteLeave(req) && (
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleApprove(req.id)}
-                          className="h-8 px-2 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40"
-                          title="Approve Request"
-                        >
-                          <Check className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleReject(req.id)}
+                          onClick={() => {
+                            setDeleteReason("");
+                            setDeletingLeave(req);
+                          }}
                           className="h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
-                          title="Reject Request"
+                          title="Delete Leave Application from Server"
                         >
-                          <X className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" />
                         </Button>
-                      </div>
-                    ) : (
-                      <span className="text-xs text-slate-400">—</span>
-                    )}
+                      )}
+                      {!canApprove && !canDeleteLeave(req) && (
+                        <span className="text-xs text-slate-400">—</span>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -537,6 +611,75 @@ export function LeaveManager({
             </Button>
             <Button type="submit" variant="coral" size="sm">
               Submit Leave
+            </Button>
+          </div>
+        </form>
+      </Modal>
+
+      {/* Delete Leave Confirmation Modal */}
+      <Modal
+        isOpen={!!deletingLeave}
+        onClose={() => setDeletingLeave(null)}
+        title={`Delete Leave Application`}
+        description="Permanently delete this leave record from Google Cloud Firestore"
+        maxWidth="md"
+      >
+        <form onSubmit={handleConfirmDeleteLeave} className="space-y-4">
+          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-sm">Permanent Server Deletion</p>
+              <p>
+                You are about to delete the leave application for{" "}
+                <strong>{deletingLeave?.employeeName}</strong> (
+                {deletingLeave?.leaveType?.toUpperCase()} Leave,{" "}
+                {deletingLeave?.daysCount}{" "}
+                {deletingLeave?.daysCount === 1 ? "day" : "days"}).
+              </p>
+              <p>
+                Duration:{" "}
+                <span className="font-semibold">
+                  {deletingLeave ? formatDate(deletingLeave.startDate) : ""} &rarr;{" "}
+                  {deletingLeave ? formatDate(deletingLeave.endDate) : ""}
+                </span>
+              </p>
+              <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                This record will be permanently erased from Google Cloud Firestore and cannot be undone.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Reason for Deletion (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="e.g. Cancelled by employee, duplicate entry..."
+              className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeletingLeave(null)}
+              disabled={isDeletingLeave}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              size="sm"
+              isLoading={isDeletingLeave}
+              leftIcon={<Trash2 className="w-4 h-4" />}
+            >
+              Confirm Permanent Deletion
             </Button>
           </div>
         </form>

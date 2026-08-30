@@ -1,6 +1,7 @@
-import { collection, doc, getDocs, getDoc, setDoc, query, where, updateDoc } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, query, where, updateDoc, deleteDoc } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
+import { AuditService } from './audit-service';
 import { LeaveRequest, LeaveBalance } from '@/types';
 
 export class LeaveService {
@@ -81,5 +82,59 @@ export class LeaveService {
       console.error('Firestore updateLeaveStatus error:', error.message);
       return false;
     }
+  }
+
+  public static async deleteLeaveRequest(
+    id: string,
+    adminUser?: { id: string; name: string; role?: string },
+    reason?: string
+  ): Promise<boolean> {
+    if (!id) return false;
+
+    // 1. Try Server API
+    try {
+      const res = await fetch(`/api/leave?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+        }
+        return true;
+      }
+    } catch {}
+
+    // 2. Direct Firestore Client SDK
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, this.reqCollectionName, id);
+        const snap = await getDoc(docRef);
+        const leaveData = snap.exists() ? (snap.data() as LeaveRequest) : null;
+
+        await deleteDoc(docRef);
+
+        try {
+          await AuditService.logAction({
+            action: 'LEAVE_REQUEST_DELETED',
+            module: 'leave',
+            details: `Deleted leave application ${id} for employee ${leaveData?.employeeName || leaveData?.employeeId || ''} (${leaveData?.startDate || ''} to ${leaveData?.endDate || ''}). Reason: ${reason || 'User/Admin requested deletion'}`,
+            userId: adminUser?.id || 'usr-admin',
+            userName: adminUser?.name || 'Administrator',
+            userRole: adminUser?.role || 'admin',
+            recordId: id,
+            recordTitle: `Leave Request ${id}`,
+          });
+        } catch {}
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+        }
+        return true;
+      } catch (err: any) {
+        console.error('Firestore deleteLeaveRequest error:', err.message);
+        return false;
+      }
+    }
+    return false;
   }
 }

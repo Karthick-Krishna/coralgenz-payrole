@@ -39,6 +39,8 @@ import {
   Eye,
   CreditCard,
   ChevronRight,
+  Trash2,
+  AlertTriangle,
 } from "lucide-react";
 
 interface RequestManagerProps {
@@ -56,6 +58,11 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState("all");
   const [statusFilter, setStatusFilter] = useState("all");
+
+  // Deletion Modal State
+  const [deletingRequest, setDeletingRequest] = useState<EmployeeRequest | null>(null);
+  const [isDeletingRequest, setIsDeletingRequest] = useState(false);
+  const [deleteReason, setDeleteReason] = useState("");
 
   // Modal: Create New Request
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -205,6 +212,48 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
     );
     setReviewingRequest(null);
     refreshData();
+  };
+
+  const handleConfirmDeleteRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deletingRequest) return;
+    setIsDeletingRequest(true);
+    try {
+      const res = await RequestService.deleteRequest(
+        deletingRequest.id,
+        {
+          id: user?.id || "usr-admin",
+          name: user?.displayName || "Admin",
+          role: currentRole,
+        },
+        deleteReason.trim() || `Deleted request ticket ${deletingRequest.id}`
+      );
+      if (res) {
+        success("Request Ticket Deleted", "Permanently removed ticket and claim from the server.");
+        setDeletingRequest(null);
+        if (reviewingRequest?.id === deletingRequest.id) {
+          setReviewingRequest(null);
+        }
+        refreshData();
+        onRefresh?.();
+      } else {
+        error("Delete Failed", "Could not remove request from the server.");
+      }
+    } catch (err: any) {
+      error("Error", err.message || "Failed to delete request ticket.");
+    } finally {
+      setIsDeletingRequest(false);
+    }
+  };
+
+  const canDeleteRequest = (req: EmployeeRequest) => {
+    return (
+      currentRole === "super_admin" ||
+      currentRole === "hr_admin" ||
+      currentRole === "manager" ||
+      (req.employeeId === myEmployeeId &&
+        (req.status === "pending" || req.status === "under_review"))
+    );
   };
 
   const statusBadgeVariant = (s: RequestStatus): "success" | "warning" | "danger" | "coral" | "secondary" => {
@@ -420,20 +469,38 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
                   </span>
                 </div>
 
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    setReviewingRequest(req);
-                    setReviewerComments(req.reviewerComments || "");
-                  }}
-                  className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
-                >
-                  <Eye className="w-3.5 h-3.5 mr-1" />
-                  {canApprove && (req.status === "pending" || req.status === "under_review")
-                    ? "Review"
-                    : "Details"}
-                </Button>
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setReviewingRequest(req);
+                      setReviewerComments(req.reviewerComments || "");
+                    }}
+                    className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
+                  >
+                    <Eye className="w-3.5 h-3.5 mr-1" />
+                    {canApprove && (req.status === "pending" || req.status === "under_review")
+                      ? "Review"
+                      : "Details"}
+                  </Button>
+
+                  {canDeleteRequest(req) && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteReason("");
+                        setDeletingRequest(req);
+                      }}
+                      className="h-8 px-2 text-xs text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 border-rose-200 dark:border-rose-800"
+                      title="Delete Ticket from Server"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 mr-1" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
           ))
@@ -514,20 +581,37 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
                   </TableCell>
 
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        setReviewingRequest(req);
-                        setReviewerComments(req.reviewerComments || "");
-                      }}
-                      className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
-                    >
-                      <Eye className="w-3.5 h-3.5 mr-1" />
-                      {canApprove && (req.status === "pending" || req.status === "under_review")
-                        ? "Review"
-                        : "Details"}
-                    </Button>
+                    <div className="flex items-center justify-end gap-1.5">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          setReviewingRequest(req);
+                          setReviewerComments(req.reviewerComments || "");
+                        }}
+                        className="h-8 px-2.5 text-xs text-coral-600 hover:text-coral-700"
+                      >
+                        <Eye className="w-3.5 h-3.5 mr-1" />
+                        {canApprove && (req.status === "pending" || req.status === "under_review")
+                          ? "Review"
+                          : "Details"}
+                      </Button>
+
+                      {canDeleteRequest(req) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setDeleteReason("");
+                            setDeletingRequest(req);
+                          }}
+                          className="h-8 px-2 text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40"
+                          title="Delete Ticket from Server"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))
@@ -805,45 +889,75 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
                   />
                 </div>
 
-                <div className="flex flex-col sm:flex-row justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  {canDeleteRequest(reviewingRequest) && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setDeleteReason("");
+                        setDeletingRequest(reviewingRequest);
+                      }}
+                      className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs w-full sm:w-auto"
+                      leftIcon={<Trash2 className="w-3.5 h-3.5" />}
+                    >
+                      Delete Ticket
+                    </Button>
+                  )}
+                  <div className="flex items-center justify-end gap-2 w-full sm:w-auto ml-auto">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setReviewingRequest(null)}
+                    >
+                      Close
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="danger"
+                      size="sm"
+                      onClick={() => handleReviewAction("rejected")}
+                      leftIcon={<XCircle className="w-4 h-4" />}
+                    >
+                      Reject
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="coral"
+                      size="sm"
+                      onClick={() => handleReviewAction("approved")}
+                      leftIcon={<CheckCircle2 className="w-4 h-4" />}
+                    >
+                      Approve
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between pt-2">
+                {canDeleteRequest(reviewingRequest) && (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setReviewingRequest(null)}
-                    className="order-3 sm:order-1"
+                    onClick={() => {
+                      setDeleteReason("");
+                      setDeletingRequest(reviewingRequest);
+                    }}
+                    className="text-rose-600 border-rose-200 hover:bg-rose-50 dark:hover:bg-rose-950/40 text-xs"
+                    leftIcon={<Trash2 className="w-3.5 h-3.5" />}
                   >
-                    Close
+                    Delete Ticket
                   </Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    size="sm"
-                    onClick={() => handleReviewAction("rejected")}
-                    leftIcon={<XCircle className="w-4 h-4" />}
-                    className="order-2"
-                  >
-                    Reject
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="coral"
-                    size="sm"
-                    onClick={() => handleReviewAction("approved")}
-                    leftIcon={<CheckCircle2 className="w-4 h-4" />}
-                    className="order-1 sm:order-3"
-                  >
-                    Approve
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-end pt-2">
+                )}
                 <Button
                   type="button"
                   variant="outline"
                   size="sm"
                   onClick={() => setReviewingRequest(null)}
+                  className="ml-auto"
                 >
                   Close
                 </Button>
@@ -851,6 +965,72 @@ export function RequestManager({ initialRequests, employees, onRefresh }: Reques
             )}
           </div>
         )}
+      </Modal>
+
+      {/* MODAL: DELETE CONFIRMATION */}
+      <Modal
+        isOpen={!!deletingRequest}
+        onClose={() => setDeletingRequest(null)}
+        title="Delete Request Ticket"
+        description="Permanently delete this request and claim from Google Cloud Firestore"
+        maxWidth="md"
+      >
+        <form onSubmit={handleConfirmDeleteRequest} className="space-y-4">
+          <div className="p-4 rounded-xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-200 text-xs flex items-start gap-3">
+            <AlertTriangle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+            <div className="space-y-1">
+              <p className="font-bold text-sm">Permanent Server Deletion</p>
+              <p>
+                You are about to delete ticket <strong>{deletingRequest?.title}</strong> for{" "}
+                <strong>{deletingRequest?.employeeName}</strong>.
+              </p>
+              <p>
+                Category:{" "}
+                <span className="font-semibold capitalize">
+                  {deletingRequest?.type?.replace("_", " ")}
+                </span>
+                {deletingRequest?.amount ? ` • Amount: ${formatINR(deletingRequest.amount)}` : ""}
+              </p>
+              <p className="text-[11px] text-rose-700 dark:text-rose-300">
+                This ticket and its audit references will be permanently erased from Google Cloud Firestore.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <label className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Reason for Deletion (Optional)
+            </label>
+            <textarea
+              rows={2}
+              value={deleteReason}
+              onChange={(e) => setDeleteReason(e.target.value)}
+              placeholder="e.g. Cancelled by employee, duplicate ticket..."
+              className="w-full text-xs rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500"
+            />
+          </div>
+
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-slate-100 dark:border-slate-800">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setDeletingRequest(null)}
+              disabled={isDeletingRequest}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="danger"
+              size="sm"
+              isLoading={isDeletingRequest}
+              leftIcon={<Trash2 className="w-4 h-4" />}
+            >
+              Confirm Permanent Deletion
+            </Button>
+          </div>
+        </form>
       </Modal>
     </div>
   );

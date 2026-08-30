@@ -1,6 +1,7 @@
-import { collection, doc, getDocs, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
+import { collection, doc, getDocs, getDoc, setDoc, deleteDoc, updateDoc, query, where } from 'firebase/firestore';
 import { db, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
+import { AuditService } from './audit-service';
 import { EmployeeRequest } from '@/types';
 
 export class RequestService {
@@ -44,15 +45,57 @@ export class RequestService {
     }
   }
 
-  public static async deleteRequest(id: string): Promise<boolean> {
-    if (!id || !isFirebaseConfigured || !db) return false;
+  public static async deleteRequest(
+    id: string,
+    adminUser?: { id: string; name: string; role?: string },
+    reason?: string
+  ): Promise<boolean> {
+    if (!id) return false;
 
+    // 1. Try Server API
     try {
-      await deleteDoc(doc(db, this.collectionName, id));
-      return true;
-    } catch (error: any) {
-      console.error('Firestore deleteRequest error:', error.message);
-      return false;
+      const res = await fetch(`/api/requests?id=${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      if (res.ok) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+        }
+        return true;
+      }
+    } catch {}
+
+    // 2. Direct Firestore SDK
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, this.collectionName, id);
+        const snap = await getDoc(docRef);
+        const reqData = snap.exists() ? (snap.data() as EmployeeRequest) : null;
+
+        await deleteDoc(docRef);
+
+        try {
+          await AuditService.logAction({
+            action: 'EMPLOYEE_REQUEST_DELETED',
+            module: 'requests',
+            details: `Deleted ticket ${id} (${reqData?.type || ''} - ${reqData?.title || ''}) for ${reqData?.employeeName || reqData?.employeeId || ''}. Reason: ${reason || 'User/Admin requested deletion'}`,
+            userId: adminUser?.id || 'usr-admin',
+            userName: adminUser?.name || 'Administrator',
+            userRole: adminUser?.role || 'admin',
+            recordId: id,
+            recordTitle: `Ticket ${id} - ${reqData?.title || ''}`,
+          });
+        } catch {}
+
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('coralgenz_store_updated'));
+        }
+        return true;
+      } catch (error: any) {
+        console.error('Firestore deleteRequest error:', error.message);
+        return false;
+      }
     }
+    return false;
   }
 }
