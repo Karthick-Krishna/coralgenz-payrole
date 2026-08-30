@@ -280,7 +280,7 @@ export default function LoginPage() {
             </div>
             <div className="flex items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
               <span className="text-slate-500 font-medium">Corporate Email:</span>
-              <span className="font-mono font-bold text-sky-600 dark:text-sky-400">admin@coralgenz.co.in</span>
+              <span className="font-mono font-bold text-sky-600 dark:text-sky-400">karthick@coralgenz.co.in</span>
             </div>
             <div className="flex items-center justify-between py-1">
               <span className="text-slate-500 font-medium">Turnaround Time:</span>

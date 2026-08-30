@@ -24,7 +24,7 @@ export const DEMO_ORGANIZATION: Organization = {
   name: "Coralgenz Technologies Pvt. Ltd.",
   tagline: "Smart Payroll & Workforce Management",
   logoUrl: "/logo.png",
-  email: "admin@coralgenz.co.in",
+  email: "karthick@coralgenz.co.in",
   phone: "+91 422 456 7890",
   website: "https://coralgenz.co.in",
   address: "Tristar Tower, 2nd Floor, Avinashi Road, Peelamedu",

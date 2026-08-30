@@ -72,7 +72,7 @@ export default function ForgotPasswordPage() {
               </div>
               <div className="flex items-center justify-between py-1 border-b border-slate-200">
                 <span className="text-slate-500 font-medium">Corporate Email:</span>
-                <span className="font-mono font-bold text-sky-600">admin@coralgenz.co.in</span>
+                <span className="font-mono font-bold text-sky-600">karthick@coralgenz.co.in</span>
               </div>
               <div className="flex items-center justify-between py-1">
                 <span className="text-slate-500 font-medium">Turnaround Time:</span>
