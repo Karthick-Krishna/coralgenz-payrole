@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server';
 import { adminDb } from '@/lib/firebase/admin';
 import { db } from '@/lib/firebase/config';
-import { doc, getDoc, setDoc, deleteDoc, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, getDoc, setDoc, deleteDoc } from 'firebase/firestore';
 import { cleanFirestoreData } from '@/lib/firebase/sanitize';
+import { FirestoreRest } from '@/lib/firebase/firestore-rest';
 import { EmployeeService } from '@/lib/firebase/employee-service';
 import { Employee } from '@/types';
 
@@ -99,7 +100,17 @@ export async function PUT(
       }
     }
 
-    // 2. Client Firestore Fallback / Complement
+    // 2. Google Cloud Firestore REST API Update
+    if (!saved) {
+      try {
+        const restSaved = await FirestoreRest.setEmployee(id, cleanUpdates as Employee);
+        if (restSaved) saved = true;
+      } catch (restErr: any) {
+        console.warn('Firestore REST setEmployee warning:', restErr.message);
+      }
+    }
+
+    // 3. Client Firestore Fallback
     if (!saved && db) {
       try {
         const docRef = doc(db, 'employees', id);
@@ -108,11 +119,6 @@ export async function PUT(
       } catch (clientErr: any) {
         console.error('Client Firestore update error:', clientErr.message);
       }
-    }
-
-    // 3. Fallback to EmployeeService
-    if (!saved) {
-      saved = await EmployeeService.updateEmployee(id, cleanUpdates);
     }
 
     if (saved) {

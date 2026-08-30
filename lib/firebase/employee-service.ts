@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db, auth, isFirebaseConfigured } from './config';
 import { cleanFirestoreData } from './sanitize';
+import { FirestoreRest } from './firestore-rest';
 import { AuditService } from './audit-service';
 import { Employee, UserRole } from '@/types';
 
@@ -41,23 +42,31 @@ export class EmployeeService {
    * Fetch all active employees directly from Google Cloud Firestore
    */
   public static async getEmployees(): Promise<Employee[]> {
-    if (!isFirebaseConfigured || !db) return [];
-    
-    try {
-      const q = query(collection(db, this.collectionName));
-      const querySnapshot = await getDocs(q);
-      const employees: Employee[] = [];
-      
-      querySnapshot.forEach((docSnap) => {
-        const data = docSnap.data() as Employee;
-        if (data && data.status !== 'inactive') {
-          employees.push({ ...data, id: docSnap.id });
+    if (isFirebaseConfigured && db) {
+      try {
+        const q = query(collection(db, this.collectionName));
+        const querySnapshot = await getDocs(q);
+        const employees: Employee[] = [];
+        
+        querySnapshot.forEach((docSnap) => {
+          const data = docSnap.data() as Employee;
+          if (data && data.status !== 'inactive') {
+            employees.push({ ...data, id: docSnap.id });
+          }
+        });
+        
+        if (employees.length > 0) {
+          return employees.sort((a, b) => b.id.localeCompare(a.id));
         }
-      });
-      
-      return employees.sort((a, b) => b.id.localeCompare(a.id));
-    } catch (error: any) {
-      console.error('Firestore getEmployees error:', error?.message || error);
+      } catch (error: any) {
+        console.warn('Firestore getEmployees notice:', error?.message || error);
+      }
+    }
+
+    try {
+      const restEmps = await FirestoreRest.getEmployees();
+      return restEmps.filter((e) => e.status !== 'inactive');
+    } catch {
       return [];
     }
   }
@@ -66,17 +75,25 @@ export class EmployeeService {
    * Get single employee by ID from Firestore
    */
   public static async getEmployeeById(id: string): Promise<Employee | null> {
-    if (!id || !isFirebaseConfigured || !db) return null;
+    if (!id) return null;
+
+    if (isFirebaseConfigured && db) {
+      try {
+        const docRef = doc(db, this.collectionName, id);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+          return { ...docSnap.data(), id: docSnap.id } as Employee;
+        }
+      } catch (error: any) {
+        console.warn(`Firestore getEmployeeById notice:`, error?.message || error);
+      }
+    }
 
     try {
-      const docRef = doc(db, this.collectionName, id);
-      const docSnap = await getDoc(docRef);
-      if (docSnap.exists()) {
-        return { ...docSnap.data(), id: docSnap.id } as Employee;
-      }
-    } catch (error: any) {
-      console.error(`Firestore getEmployeeById error:`, error?.message || error);
-    }
+      const restEmp = await FirestoreRest.getEmployee(id);
+      if (restEmp) return restEmp;
+    } catch {}
+
     return null;
   }
 
