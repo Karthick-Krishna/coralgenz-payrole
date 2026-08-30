@@ -70,6 +70,19 @@ export const DEMO_EMPLOYEES: Employee[] = [];
 
 export const DEMO_DEPARTMENTS: Department[] = [
   {
+    id: "dept-ai",
+    organizationId: "org-coralgenz-01",
+    name: "AI & Innovation",
+    code: "AI",
+    description: "Artificial Intelligence, Neural Architectures & Next-Gen R&D",
+    colorHex: "#f97316",
+    employeeCount: 0,
+    monthlyPayrollCost: 0,
+    createdAt: "2024-01-01T00:00:00.000Z",
+    updatedAt: "2026-08-01T00:00:00.000Z",
+    isArchived: false,
+  },
+  {
     id: "dept-01",
     organizationId: "org-coralgenz-01",
     name: "Engineering",

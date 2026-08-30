@@ -29,6 +29,7 @@ import {
   EyeOff,
   Lock,
   ShieldAlert,
+  Building2,
 } from "lucide-react";
 
 interface EmployeeFormProps {
@@ -54,6 +55,7 @@ export function EmployeeForm({
   const [activeTab, setActiveTab] = useState("personal");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [useCustomDeptDesig, setUseCustomDeptDesig] = useState(true);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -76,10 +78,15 @@ export function EmployeeForm({
     portalConfirmPassword: isEditing ? "" : "Welcome@2026",
     portalRole: (initialData?.portalRole || initialData?.role || "employee") as UserRole,
 
+    // Manual Department & Designation
+    customDepartmentName: initialData?.departmentName || "AI & Innovation",
+    customDepartmentCode: "AI",
+    customDesignationTitle: initialData?.designationTitle || "AI Architect & Lead Engineer",
+
     // Employment
     joiningDate: initialData?.joiningDate || new Date().toISOString().split("T")[0],
-    departmentId: initialData?.departmentId || departments[0]?.id || "dept-01",
-    designationId: initialData?.designationId || designations[0]?.id || "desig-01",
+    departmentId: initialData?.departmentId || departments[0]?.id || "dept-ai",
+    designationId: initialData?.designationId || designations[0]?.id || "desig-ai",
     managerId: initialData?.managerId || "",
     employmentType: initialData?.employmentType || ("full_time" as EmploymentType),
     status: initialData?.status || ("active" as EmployeeStatus),
@@ -129,10 +136,15 @@ export function EmployeeForm({
         portalConfirmPassword: "",
         portalRole: (initialData.portalRole || initialData.role || derivedRole) as UserRole,
 
+        // Manual Department & Designation
+        customDepartmentName: initialData.departmentName || "AI & Innovation",
+        customDepartmentCode: "AI",
+        customDesignationTitle: initialData.designationTitle || "AI Architect & Lead Engineer",
+
         // Employment
         joiningDate: initialData.joiningDate || new Date().toISOString().split("T")[0],
-        departmentId: initialData.departmentId || departments[0]?.id || "dept-01",
-        designationId: initialData.designationId || designations[0]?.id || "desig-01",
+        departmentId: initialData.departmentId || departments[0]?.id || "dept-ai",
+        designationId: initialData.designationId || designations[0]?.id || "desig-ai",
         managerId: initialData.managerId || "",
         employmentType: initialData.employmentType || ("full_time" as EmploymentType),
         status: initialData.status || ("active" as EmployeeStatus),
@@ -155,29 +167,9 @@ export function EmployeeForm({
     }
   }, [initialData, departments, designations]);
 
-  const inferRoleFromDesignation = (desigId?: string, deptId?: string): UserRole => {
-    if (!isSuperAdmin) return "employee";
-    const desig = designations.find((d) => d.id === desigId);
-    const dept = departments.find((d) => d.id === deptId);
-    const title = (desig?.title || "").toLowerCase();
-    const deptName = (dept?.name || "").toLowerCase();
-
-    if (title.includes("hr") || title.includes("human resource") || deptName.includes("human resource") || deptName.includes("talent")) {
-      return "hr_admin";
-    }
-    if (title.includes("payroll") || title.includes("finance") || title.includes("accounts") || deptName.includes("payroll") || deptName.includes("finance")) {
-      return "manager";
-    }
-    if (title.includes("manager") || title.includes("lead") || title.includes("director") || title.includes("head") || title.includes("vp")) {
-      return "manager";
-    }
-    return "employee";
-  };
-
   const handleChange = (field: string, value: unknown) => {
     setFormData((prev) => {
       const updated = { ...prev, [field]: value };
-      // Auto-suggest corporate email if firstName/lastName typed and email was empty
       if ((field === "firstName" || field === "lastName") && !isEditing) {
         const fn = field === "firstName" ? (value as string) : prev.firstName;
         const ln = field === "lastName" ? (value as string) : prev.lastName;
@@ -192,25 +184,14 @@ export function EmployeeForm({
   const handleDepartmentChange = (deptId: string) => {
     const validDesig = designations.find((d) => d.departmentId === deptId);
     const nextDesigId = validDesig ? validDesig.id : formData.designationId;
+    const selectedDept = departments.find((d) => d.id === deptId);
     setFormData((prev) => ({
       ...prev,
       departmentId: deptId,
       designationId: nextDesigId,
+      customDepartmentName: selectedDept?.name || prev.customDepartmentName,
+      customDepartmentCode: selectedDept?.code || prev.customDepartmentCode,
     }));
-  };
-
-  const generateRandomPassword = () => {
-    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789@#$";
-    let pass = "";
-    for (let i = 0; i < 10; i++) {
-      pass += chars.charAt(Math.floor(Math.random() * chars.length));
-    }
-    setFormData((prev) => ({
-      ...prev,
-      portalPassword: pass,
-      portalConfirmPassword: pass,
-    }));
-    success("Password Generated", `Generated secure password: ${pass}`);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -236,9 +217,29 @@ export function EmployeeForm({
 
     setIsSubmitting(true);
     try {
-      const selectedDept = departments.find((d) => d.id === formData.departmentId);
-      const selectedDesig = designations.find((d) => d.id === formData.designationId);
+      const selectedDeptObj = departments.find((d) => d.id === formData.departmentId);
+      const selectedDesigObj = designations.find((d) => d.id === formData.designationId);
       const selectedManager = allEmployees.find((e) => e.id === formData.managerId);
+
+      const finalDeptName = useCustomDeptDesig 
+        ? (formData.customDepartmentName.trim() || "AI & Innovation")
+        : (selectedDeptObj?.name || "AI & Innovation");
+      
+      const finalDeptCode = useCustomDeptDesig
+        ? (formData.customDepartmentCode.trim().toUpperCase() || "AI")
+        : (selectedDeptObj?.code || "AI");
+
+      const finalDeptId = useCustomDeptDesig
+        ? `dept-${finalDeptName.toLowerCase().replace(/[^a-z0-9]/g, "-")}`
+        : (formData.departmentId || "dept-ai");
+
+      const finalDesigTitle = useCustomDeptDesig
+        ? (formData.customDesignationTitle.trim() || "AI Architect & Lead Engineer")
+        : (selectedDesigObj?.title || "Staff");
+
+      const finalDesigId = useCustomDeptDesig
+        ? `desig-${finalDesigTitle.toLowerCase().replace(/[^a-z0-9]/g, "-")}`
+        : (formData.designationId || "desig-ai");
 
       const assignedRole = isSuperAdmin 
         ? (formData.portalRole || initialData?.portalRole || initialData?.role || "employee")
@@ -261,10 +262,10 @@ export function EmployeeForm({
         country: formData.country.trim() || "India",
         postalCode: formData.postalCode.trim() || null,
         joiningDate: formData.joiningDate,
-        departmentId: formData.departmentId,
-        departmentName: selectedDept?.name || "Engineering",
-        designationId: formData.designationId,
-        designationTitle: selectedDesig?.title || "Associate Engineer",
+        departmentId: finalDeptId,
+        departmentName: finalDeptName,
+        designationId: finalDesigId,
+        designationTitle: finalDesigTitle,
         managerId: formData.managerId || null,
         managerName: selectedManager ? `${selectedManager.firstName} ${selectedManager.lastName}` : null,
         employmentType: formData.employmentType,
@@ -302,7 +303,7 @@ export function EmployeeForm({
           throw new Error("Failed to update employee details on server.");
         }
 
-        // 1. Update password on Auth server if changed or provided
+        // Update password on Auth server if changed or provided
         if (formData.portalPassword && formData.portalPassword.trim()) {
           try {
             await AuthService.updatePassword({
@@ -345,7 +346,7 @@ export function EmployeeForm({
           router.push(`/employees/${initialData.id}`);
         }
       } else {
-        // 1. Save Employee and Provision Login Account directly via Server API
+        // Save Employee and Provision Login Account directly via Server API
         const newEmp = await EmployeeService.addEmployee(payload, {
           portalPassword: formData.portalPassword,
           portalRole: assignedRole,
@@ -358,7 +359,7 @@ export function EmployeeForm({
 
         success(
           "Employee & Auth Login Created!",
-          `Added ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}). Login credentials created on server with ${assignedRole.replace("_", " ").toUpperCase()} portal access!`
+          `Added ${newEmp.firstName} ${newEmp.lastName} (${newEmp.id}). Created in ${finalDeptName} as ${finalDesigTitle} with ${assignedRole.replace("_", " ").toUpperCase()} portal access!`
         );
         router.push(`/employees/${newEmp.id}`);
       }
@@ -592,32 +593,87 @@ export function EmployeeForm({
           {/* TAB 3: EMPLOYMENT & SALARY */}
           {activeTab === "employment" && (
             <div className="space-y-4 animate-in fade-in duration-150">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Select
-                  label="Department"
-                  value={formData.departmentId}
-                  onChange={(e) => handleDepartmentChange(e.target.value)}
-                >
-                  {departments.map((d) => (
-                    <option key={d.id} value={d.id}>
-                      {d.name} ({d.code})
-                    </option>
-                  ))}
-                </Select>
+              
+              {/* Department & Designation Manual Entry Box */}
+              <div className="p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Building2 className="w-4.5 h-4.5 text-coral-500" />
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-800 dark:text-slate-200">
+                      Department & Designation Setup
+                    </h4>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setUseCustomDeptDesig(!useCustomDeptDesig)}
+                    className="text-xs text-coral-600 dark:text-coral-400 font-semibold hover:bg-coral-50 dark:hover:bg-coral-950/30"
+                  >
+                    {useCustomDeptDesig ? "Switch to Select Dropdown" : "Type Manually"}
+                  </Button>
+                </div>
 
-                <Select
-                  label="Designation"
-                  value={formData.designationId}
-                  onChange={(e) => handleChange("designationId", e.target.value)}
-                >
-                  {designations
-                    .filter((d) => !formData.departmentId || d.departmentId === formData.departmentId)
-                    .map((d) => (
-                      <option key={d.id} value={d.id}>
-                        {d.title}
-                      </option>
-                    ))}
-                </Select>
+                {useCustomDeptDesig ? (
+                  <div className="space-y-4 animate-in fade-in duration-150">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="sm:col-span-2">
+                        <Input
+                          label="Department Name"
+                          required
+                          value={formData.customDepartmentName}
+                          onChange={(e) => handleChange("customDepartmentName", e.target.value)}
+                          placeholder="e.g. AI & Innovation"
+                          helperText="Type any custom department name"
+                        />
+                      </div>
+                      <Input
+                        label="Department Code"
+                        value={formData.customDepartmentCode}
+                        onChange={(e) => handleChange("customDepartmentCode", e.target.value.toUpperCase())}
+                        placeholder="e.g. AI"
+                        helperText="Short code (e.g. AI, ENG)"
+                      />
+                    </div>
+
+                    <Input
+                      label="Designation Title"
+                      required
+                      value={formData.customDesignationTitle}
+                      onChange={(e) => handleChange("customDesignationTitle", e.target.value)}
+                      placeholder="e.g. AI Architect & Lead Engineer"
+                      helperText="Type official designation or job title for this employee"
+                    />
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Select
+                      label="Department"
+                      value={formData.departmentId}
+                      onChange={(e) => handleDepartmentChange(e.target.value)}
+                    >
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name} ({d.code})
+                        </option>
+                      ))}
+                    </Select>
+
+                    <Select
+                      label="Designation"
+                      value={formData.designationId}
+                      onChange={(e) => handleChange("designationId", e.target.value)}
+                    >
+                      {designations
+                        .filter((d) => !formData.departmentId || d.departmentId === formData.departmentId)
+                        .map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.title}
+                          </option>
+                        ))}
+                    </Select>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -756,37 +812,32 @@ export function EmployeeForm({
           {/* TAB 5: EMERGENCY CONTACT */}
           {activeTab === "emergency" && (
             <div className="space-y-4 animate-in fade-in duration-150">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <Input
+                label="Contact Person Name"
+                value={formData.emergencyName}
+                onChange={(e) => handleChange("emergencyName", e.target.value)}
+                placeholder="e.g. Ramesh Kumar"
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <Input
-                  label="Emergency Contact Name"
-                  value={formData.emergencyName}
-                  onChange={(e) => handleChange("emergencyName", e.target.value)}
-                  placeholder="e.g. Sivasankaran M"
-                />
-                <Select
                   label="Relationship"
                   value={formData.emergencyRelationship}
                   onChange={(e) => handleChange("emergencyRelationship", e.target.value)}
-                >
-                  <option value="Parent">Parent</option>
-                  <option value="Spouse">Spouse</option>
-                  <option value="Sibling">Sibling</option>
-                  <option value="Friend">Friend</option>
-                  <option value="Other">Other</option>
-                </Select>
+                  placeholder="e.g. Father / Spouse"
+                />
                 <Input
-                  label="Emergency Phone"
+                  label="Contact Phone Number"
                   value={formData.emergencyPhone}
                   onChange={(e) => handleChange("emergencyPhone", e.target.value)}
-                  placeholder="+91 98422 00000"
+                  placeholder="+91 98422 99999"
                 />
               </div>
             </div>
           )}
         </CardContent>
 
-        <CardFooter className="flex justify-between items-center bg-slate-50/50 dark:bg-slate-900/50">
-          <div className="flex gap-2">
+        <CardFooter className="flex items-center justify-between p-4 sm:p-6 bg-slate-50/50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-800">
+          <div>
             {activeTab !== "personal" && (
               <Button
                 type="button"
@@ -800,10 +851,12 @@ export function EmployeeForm({
                 Previous Step
               </Button>
             )}
-            {activeTab !== "emergency" && (
+          </div>
+          <div>
+            {activeTab !== "emergency" ? (
               <Button
                 type="button"
-                variant="secondary"
+                variant="coral"
                 size="sm"
                 onClick={() => {
                   const idx = tabs.findIndex((t) => t.id === activeTab);
@@ -813,18 +866,18 @@ export function EmployeeForm({
               >
                 Next Step
               </Button>
+            ) : (
+              <Button
+                type="submit"
+                variant="coral"
+                size="sm"
+                isLoading={isSubmitting}
+                leftIcon={<Save className="w-4 h-4" />}
+              >
+                {isEditing ? "Save Changes" : "Save & Provision"}
+              </Button>
             )}
           </div>
-
-          <Button
-            type="submit"
-            variant="coral"
-            size="sm"
-            isLoading={isSubmitting}
-            leftIcon={<Check className="w-4 h-4" />}
-          >
-            {isEditing ? "Save Changes" : "Create & Provision Login"}
-          </Button>
         </CardFooter>
       </Card>
     </form>
