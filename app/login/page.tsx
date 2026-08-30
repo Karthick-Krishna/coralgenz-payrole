@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useAuth } from "@/lib/auth/auth-context";
 import { Button } from "@/components/ui/button";
+import { Modal } from "@/components/ui/modal";
 import { useToast } from "@/components/ui/toast";
 import {
   Lock,
@@ -15,6 +16,9 @@ import {
   EyeOff,
   AlertCircle,
   Sparkles,
+  KeyRound,
+  ShieldAlert,
+  UserCheck,
 } from "lucide-react";
 
 export default function LoginPage() {
@@ -28,6 +32,9 @@ export default function LoginPage() {
   const [rememberMe, setRememberMe] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+
+  // Contact SuperAdmin modal state
+  const [showContactAdminModal, setShowContactAdminModal] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -95,7 +102,7 @@ export default function LoginPage() {
       {/* Main Content Area - Large Desktop Layout */}
       <main className="relative z-10 w-full max-w-xl lg:max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 lg:py-12 my-auto">
         
-        {/* Animated Brand Heading Design (Prominent & Larger on Desktop) */}
+        {/* Animated Brand Heading Design */}
         <div className="text-center space-y-3.5 mb-8">
           {/* Animated Glowing Logo Badge */}
           <div className="relative inline-flex items-center justify-center mb-1">
@@ -122,7 +129,7 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Central Authentication Card (Larger, Spacious & High-End) */}
+        {/* Central Authentication Card */}
         <div className="bg-white/95 backdrop-blur-2xl border border-slate-200/90 shadow-[0_30px_70px_-15px_rgba(2,132,199,0.18)] rounded-3xl p-7 sm:p-10 lg:p-12 space-y-7 transition-all">
           
           {/* Card Header */}
@@ -177,12 +184,13 @@ export default function LoginPage() {
                 <label className="block text-xs sm:text-sm font-bold uppercase tracking-wider text-slate-700">
                   Account Password
                 </label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs sm:text-sm text-sky-600 hover:text-sky-700 font-semibold transition-colors"
+                <button
+                  type="button"
+                  onClick={() => setShowContactAdminModal(true)}
+                  className="text-xs sm:text-sm text-sky-600 hover:text-sky-700 font-semibold transition-colors focus:outline-none"
                 >
                   Forgot password?
-                </Link>
+                </button>
               </div>
               <div className="relative rounded-2xl shadow-xs">
                 <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-slate-400">
@@ -242,6 +250,56 @@ export default function LoginPage() {
           </div>
         </div>
       </main>
+
+      {/* Contact SuperAdmin Password Reset Modal */}
+      <Modal
+        isOpen={showContactAdminModal}
+        onClose={() => setShowContactAdminModal(false)}
+        title="Contact Super Admin for Password Reset"
+        description="Password resets are strictly managed by Organization Administrators for corporate security compliance."
+        maxWidth="md"
+      >
+        <div className="space-y-4 text-left">
+          <div className="p-4 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 text-amber-900 dark:text-amber-200 text-xs sm:text-sm flex items-start gap-3">
+            <ShieldAlert className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+            <div>
+              <p className="font-bold text-sm mb-1">Corporate Security & Identity Governance Policy</p>
+              <p className="leading-relaxed">
+                Self-service password resets are disabled for corporate accounts. Please contact your <strong>Super Admin</strong> or <strong>HR Administrator</strong> to update or reset your portal credentials.
+              </p>
+            </div>
+          </div>
+
+          <div className="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-xs sm:text-sm space-y-2">
+            <div className="flex items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
+              <span className="text-slate-500 font-medium">Administrator Desk:</span>
+              <span className="font-bold text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                <UserCheck className="w-4 h-4 text-sky-600" />
+                Super Admin / HR Support
+              </span>
+            </div>
+            <div className="flex items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
+              <span className="text-slate-500 font-medium">Corporate Email:</span>
+              <span className="font-mono font-bold text-sky-600 dark:text-sky-400">admin@coralgenz.co.in</span>
+            </div>
+            <div className="flex items-center justify-between py-1">
+              <span className="text-slate-500 font-medium">Turnaround Time:</span>
+              <span className="font-medium text-emerald-600 dark:text-emerald-400">Instant Admin Reset</span>
+            </div>
+          </div>
+
+          <div className="pt-2 flex justify-end">
+            <Button
+              variant="coral"
+              size="md"
+              onClick={() => setShowContactAdminModal(false)}
+              className="w-full sm:w-auto font-bold"
+            >
+              Understood, Back to Sign In
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       {/* Clean Bottom Spacing */}
       <div className="py-6" />
